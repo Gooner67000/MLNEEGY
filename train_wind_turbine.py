@@ -64,7 +64,9 @@ REPORTS.mkdir(exist_ok=True)
 SOURCE_URL = ("https://huggingface.co/datasets/kevykibbz/"
               "wind-turbine-scada-data-for-early-fault-detection/resolve/main/"
               "wind-turbine-scada-data-for-early-fault-detection.csv")
-SUBSAMPLE_CSV = ROOT / "data" / "wind_turbine_subsample.csv"
+# Only the columns the model uses, gzipped: the full 957-column subsample was
+# 95 MB -- right at GitHub's 100 MB per-file limit.
+SUBSAMPLE_CSV = ROOT / "data" / "wind_turbine_subsample.csv.gz"
 
 PER_ASSET_CAP = 1500          # rows kept per turbine
 N_ASSETS_TARGET = 15          # number of spread-out points sampled across the file
@@ -132,7 +134,9 @@ def load_data() -> pd.DataFrame:
     SUBSAMPLE_CSV.parent.mkdir(exist_ok=True)
     if not SUBSAMPLE_CSV.exists():
         df = build_subsample()
-        df.to_csv(SUBSAMPLE_CSV, index=False)
+        keep = ["time_stamp", "asset_id", "status_type_id"] + [c for c in df.columns
+                                                               if c.endswith("_avg")]
+        df[keep].to_csv(SUBSAMPLE_CSV, index=False, compression="gzip")
     return pd.read_csv(SUBSAMPLE_CSV)
 
 

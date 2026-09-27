@@ -1,0 +1,12 @@
+{
+  "dataset": "Vibration, Acoustic, Temperature, and Motor Current Dataset of Rotating Machine Under Varying Load Conditions for Fault Diagnosis (KAIST)",
+  "doi": "10.17632/ztmf3m7h5x.6",
+  "landing_page": "https://data.mendeley.com/datasets/ztmf3m7h5x/6",
+  "paper": "Jung et al., Data in Brief (2023)",
+  "license": "CC BY 4.0",
+  "raw_file": "vibration.zip",
+  "raw_sha256": "df73fa80371a2ad3c983825044447b7772fcefd1db2ac409b2b298b533e4659f",
+  "window_seconds": 2.0,
+  "channels_used": "4 accelerometers (g), each window/channel is one row",
+  "why_not_motor_current": "The same dataset's motor-current/temperature files were examined first and rejected: normal and unbalance files were recorded with a 48 Hz supply while most bearing/misalignment files used 49 Hz, and current-spectrum features tracked that session difference rather than the faults (misalignment recorded at 48 Hz looked identical to normal). Absolute temperature also drifts between runs. Vibration features here are order-tracked to avoid the same trap."
+}

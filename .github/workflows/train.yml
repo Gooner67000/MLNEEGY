@@ -4,16 +4,11 @@ on:
   push:
     branches: [main]
     paths:
-      - "train.py"
-      - "predict.py"
-      - "app.py"
-      - "backtest.py"
-      - "train_bearing.py"
-      - "train_wind_turbine.py"
-      - "machine_types.py"
+      - "*.py"
       - "backend/**"
       - "frontend/**"
       - "tests/**"
+      - "tools/**"
       - "requirements*.txt"
       - "data/**"
       - "notebooks/**"
@@ -26,16 +21,15 @@ permissions:
   contents: write
 
 concurrency:
-  # Runs now take a while, so a second push queues behind the first instead
-  # of killing it mid-way (cancel-in-progress previously caused an
-  # unrelated "operation was canceled" failure).
+  # A second push queues behind the first instead of killing it mid-way
+  # (cancel-in-progress previously caused an unrelated "operation was canceled").
   group: train
   cancel-in-progress: false
 
 jobs:
   train:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -48,72 +42,64 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
-      # Every `| tee` step below sets pipefail explicitly rather than relying
-      # on the runner's default shell behavior: without it, a script that
-      # crashes mid-run still reports the step as successful (tee, the last
-      # command in the pipe, exits 0), silently producing partial/missing
-      # output files that only surface as a confusing failure much later.
-      - name: Train model (steps 2-7)
+      # Every step pipes into tee with `set -euo pipefail` and `2>&1`: without
+      # pipefail a crashing script still reports success (tee exits 0), and
+      # without 2>&1 its traceback never reaches the log.
+      - name: CNC / machine tool (AI4I2020)
         run: |
           set -euo pipefail
           python train.py 2>&1 | tee reports-train.log
+          python predict.py
 
-      - name: Score sample machines (step 8)
-        run: python predict.py
-
-      - name: Walk-forward backtest on real run-to-failure data (no lookahead)
+      - name: Gas turbine walk-forward backtest (NASA C-MAPSS)
         run: |
           set -euo pipefail
           python backtest.py 2>&1 | tee reports-backtest.log
 
-      - name: Train bearing / rotating-equipment model (real CWRU data)
+      - name: Rotating equipment / bearings (Univ. of Ottawa, leave-bearings-out)
         run: |
           set -euo pipefail
           python train_bearing.py 2>&1 | tee reports-bearing.log
 
-      - name: Train wind turbine / generator model (real SCADA data)
+      - name: Wind turbine / generator (real SCADA)
+        timeout-minutes: 15
         run: |
           set -euo pipefail
           python train_wind_turbine.py 2>&1 | tee reports-wind-turbine.log
+
+      - name: HVAC rooftop unit (LBNL/ORNL experimental, leave-one-season-out)
         timeout-minutes: 15
-
-      # Runs even if an earlier step failed. Artifact downloads and the raw
-      # log viewer both require a signed-in GitHub session even on a public
-      # repo, so a genuine failure's traceback was invisible to anyone
-      # without repo access -- committing the log as a normal tracked file
-      # makes it readable by anyone with `git pull`, no sign-in needed.
-      - name: On failure, commit whatever logs exist so the error is readable without signing in to GitHub
-        if: failure()
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          mkdir -p ci-debug
-          cp reports-*.log ci-debug/ 2>/dev/null || true
-          echo "Run: $GITHUB_RUN_ID  Commit: $GITHUB_SHA  $(date -u)" > ci-debug/run-info.txt
-          git add -f ci-debug/
-          git commit -m "CI debug logs from failed run $GITHUB_RUN_ID [skip ci]" || true
-          git push || true
+          set -euo pipefail
+          python train_hvac.py 2>&1 | tee reports-hvac.log
 
-      - name: Run tests (incl. leakage guards, backend API, headless Streamlit app)
-        run: python -m pytest -v
+      - name: Robotic arm (UR3 CobotOps, chronological walk-forward)
+        run: |
+          set -euo pipefail
+          python train_robot.py 2>&1 | tee reports-robot.log
+
+      - name: Conveyor drive (KAIST vibration, leave-one-load-out)
+        run: |
+          set -euo pipefail
+          python train_conveyor.py 2>&1 | tee reports-conveyor.log
+
+      - name: Tests (leakage guards, feature causality, backend API, headless app)
+        run: |
+          set -euo pipefail
+          python -m pytest -v 2>&1 | tee reports-pytest.log
 
       - name: Execute notebook
         run: jupyter nbconvert --to notebook --execute --inplace notebooks/01_eda_modeling.ipynb
 
       - name: Job summary
-        # Purely informational -- must never fail the job or block the
-        # commit step after it, so tolerate any single report being
-        # missing/unreadable instead of letting `cat` exit non-zero.
+        # Informational only -- must never fail the job.
         if: always()
         continue-on-error: true
         run: |
-          for f in reports/results.md reports/backtest_results.md \
-                   reports/bearing_results.md reports/wind_turbine_results.md; do
-            if [ -f "$f" ]; then
-              cat "$f" >> "$GITHUB_STEP_SUMMARY" || echo "warning: could not append $f"
-            else
-              echo "warning: $f not found, skipping"
-            fi
+          for f in reports/results.md reports/backtest_results.md reports/bearing_results.md \
+                   reports/wind_turbine_results.md reports/hvac_results.md \
+                   reports/robot_results.md reports/conveyor_results.md; do
+            if [ -f "$f" ]; then cat "$f" >> "$GITHUB_STEP_SUMMARY"; else echo "warning: $f missing"; fi
           done
 
       - uses: actions/upload-artifact@v4
@@ -121,24 +107,22 @@ jobs:
           name: reports
           path: |
             reports/
-            reports-train.log
-            reports-backtest.log
-            reports-bearing.log
-            reports-wind-turbine.log
+            reports-*.log
 
-      # Handed to the docker-smoke-test job below, which runs on its OWN
-      # fresh runner -- keeps a Docker build from ever sharing disk/memory
-      # with this training job.
+      # Handed to the docker-smoke-test job, which runs on its own fresh runner.
       - name: Package trained models for the Docker smoke test
         run: |
           set -euo pipefail
           mkdir -p _artifact_payload
           for f in predictive_maintenance_model.pkl feature_names.pkl model_meta.json \
                    backtest_model.pkl turbine_meta.pkl \
-                   bearing_model.pkl bearing_meta.pkl \
-                   wind_turbine_model.pkl wind_turbine_meta.pkl; do
+                   bearing_model.pkl bearing_type_model.pkl bearing_meta.pkl \
+                   wind_turbine_model.pkl wind_turbine_meta.pkl \
+                   hvac_model.pkl hvac_diag_model.pkl hvac_meta.pkl \
+                   robot_model.pkl robot_meta.pkl \
+                   conveyor_model.pkl conveyor_meta.pkl; do
             if [ ! -f "$f" ]; then
-              echo "::error::$f is missing -- an earlier training step did not actually produce it, even though it reported success (likely masked by a pipefail issue). Check that step's full log."
+              echo "::error::$f is missing -- the training step that should produce it did not."
               exit 1
             fi
             cp "$f" _artifact_payload/
@@ -149,74 +133,66 @@ jobs:
           name: trained-models
           path: _artifact_payload/
 
-      - name: Commit trained models, reports, and real-data caches
+      - name: Commit trained models, reports, and data caches
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add \
             predictive_maintenance_model.pkl feature_names.pkl model_meta.json \
             backtest_model.pkl turbine_meta.pkl \
-            bearing_model.pkl bearing_meta.pkl \
+            bearing_model.pkl bearing_type_model.pkl bearing_meta.pkl \
             wind_turbine_model.pkl wind_turbine_meta.pkl \
+            hvac_model.pkl hvac_diag_model.pkl hvac_meta.pkl \
+            robot_model.pkl robot_meta.pkl \
+            conveyor_model.pkl conveyor_meta.pkl \
             reports/ notebooks/ \
-            data/cmapss_train_FD001.csv data/cwru_features_all_segments.csv \
-            data/cwru_dataset_file_log.csv data/wind_turbine_subsample.csv
+            data/cmapss_train_FD001.csv data/wind_turbine_subsample.csv.gz \
+            data/hvac_ornl_rtu.csv.gz data/robot_ur3_cobotops.csv.gz
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
             git commit -m "Update trained models and reports [skip ci]"
+            git pull --rebase
             git push
           fi
+
+      # Runs if ANY step above failed. The raw log viewer and artifact
+      # downloads need a signed-in session even on a public repo; a committed
+      # file is readable by anyone with `git pull`.
+      - name: On failure, commit logs so the error is readable without signing in
+        if: failure()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git reset -q
+          mkdir -p ci-debug
+          cp reports-*.log ci-debug/ 2>/dev/null || true
+          echo "Run: $GITHUB_RUN_ID  Commit: $GITHUB_SHA  $(date -u)" > ci-debug/run-info.txt
+          git add -f ci-debug/
+          git commit -m "CI debug logs from failed run $GITHUB_RUN_ID [skip ci]" || true
+          git pull --rebase || true
+          git push || true
 
   docker-smoke-test:
     needs: train
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-
-      - name: Disk space before build (debugging aid if this job ever fails again)
-        run: df -h
 
       - uses: actions/download-artifact@v4
         with:
           name: trained-models
           path: .
 
-      - name: Smoke-test the actual downloadable Docker stack
+      - name: Build and start the downloadable Docker stack
+        run: docker compose up -d --build
+
+      - name: Score a machine of EVERY type through the running stack
         run: |
           set -euo pipefail
-          docker compose up -d --build
-          for i in $(seq 1 30); do
-            curl -sf http://localhost:8000/health && break
-            sleep 2
-          done
-          curl -sf http://localhost:8000/health
-          TOKEN=$(curl -sf -X POST http://localhost:8000/auth/register \
-            -H "Content-Type: application/json" \
-            -d '{"name":"CI Smoke Test","email":"ci@example.com","password":"password123"}' \
-            | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
-          MACHINE_ID=$(curl -sf -X POST http://localhost:8000/machines \
-            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-            -d '{"name":"Mill-CI","machine_type":"cnc_machine_tool"}' \
-            | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
-          curl -sf -X POST "http://localhost:8000/machines/$MACHINE_ID/readings" \
-            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-            -d '{"payload":{"Type":0,"Air temperature K":300,"Process temperature K":310,"Rotational speed rpm":1500,"Torque Nm":40,"Tool wear min":100},"source":"api"}' \
-            | tee /tmp/reading.json
-          python3 -c "
-          import json
-          r = json.load(open('/tmp/reading.json'))
-          assert r['trained'] is True
-          assert 0 <= r['probability'] <= 1, r
-          assert r['risk_level'] in ('Low', 'Medium', 'High')
-          print('Docker stack smoke test passed:', r)
-          "
+          python3 tools/smoke_test.py http://localhost:8000 2>&1 | tee smoke.log
           curl -sf http://localhost:8501 > /dev/null && echo "Frontend responding"
-
-      - name: Disk space after build
-        if: always()
-        run: df -h
 
       - name: Container logs
         if: always()

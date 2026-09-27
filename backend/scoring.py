@@ -5,6 +5,7 @@ only that machine's own past readings, never another machine's, never a
 future reading -- so a live score has the same no-lookahead guarantee the
 backtest proved.
 """
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 
@@ -61,21 +62,87 @@ def _score_turbine(payload: dict, history: list[dict]) -> dict:
             "alert": prob >= 0.5, "diagnosis": None, "note": None}
 
 
+def _defaulted_note(provided: dict, expected: list[str]) -> str | None:
+    missing = [f for f in expected if f not in provided]
+    if not missing:
+        return None
+    return (f"{len(missing)} of {len(expected)} inputs weren't provided and were filled with "
+            f"typical healthy values; send the full set via CSV/API for the most accurate score.")
+
+
 def _score_bearing(payload: dict) -> dict:
     model, meta = _load("bearing_model.pkl", "bearing_meta.pkl")
-    row = {f: payload.get(f, meta["medians"][f]) for f in meta["features"]}
-    X = pd.DataFrame([row])[meta["features"]]
+    type_model, _ = _load("bearing_type_model.pkl", None)
+    feats = meta["features"]
+    row = {f: payload.get(f, meta["medians"][f]) for f in feats}
+    X = pd.DataFrame([row])[feats]
+    proba = model.predict_proba(X)[0]
+    states = meta["classes"]  # healthy / developing / faulty
+    prob_damaged = float(1 - proba[states.index("healthy")])
+    state = states[int(proba.argmax())]
+    diagnosis = state
+    if state != "healthy":
+        defect = meta["type_classes"][int(type_model.predict(X)[0])]
+        diagnosis = f"{state} fault (likely {defect.replace('_', ' ')})"
+    return {"trained": True, "probability": round(prob_damaged, 4),
+            "risk_level": risk_level(prob_damaged), "alert": state != "healthy",
+            "diagnosis": diagnosis, "note": _defaulted_note(payload, feats)}
+
+
+def _history_frame(payload: dict, history: list[dict], raw: list[str], medians: dict) -> pd.DataFrame:
+    """This machine's recent readings + the new one, oldest first, with any
+    missing raw inputs filled from typical values."""
+    rows = [{c: h.get(c, medians.get(c)) for c in raw} for h in history]
+    rows.append({c: payload.get(c, medians.get(c)) for c in raw})
+    return pd.DataFrame(rows)
+
+
+def _score_hvac(payload: dict, history: list[dict]) -> dict:
+    from pm_features import hvac_features
+    model, meta = _load("hvac_model.pkl", "hvac_meta.pkl")
+    diag_model, _ = _load("hvac_diag_model.pkl", None)
+    payload = dict(payload)
+    payload.setdefault("hour", float(datetime.now().hour))
+    feats = hvac_features(_history_frame(payload, history, meta["raw"], meta["medians"]))
+    X = feats.iloc[[-1]][meta["features"]]
+    prob = float(model.predict_proba(X)[0, 1])
+    alert = prob >= meta["threshold"]
+    diagnosis = None
+    if alert:
+        p = diag_model.predict_proba(X)[0]
+        classes = meta["classes"]
+        p[classes.index("fault_free")] = 0  # we already know it's a fault; name the likeliest one
+        diagnosis = classes[int(p.argmax())].replace("_", " ")
+    return {"trained": True, "probability": round(prob, 4), "risk_level": risk_level(prob),
+            "alert": alert, "diagnosis": diagnosis,
+            "note": _defaulted_note(payload, [c for c in meta["raw"] if c != "hour"])}
+
+
+def _score_conveyor(payload: dict) -> dict:
+    model, meta = _load("conveyor_model.pkl", "conveyor_meta.pkl")
+    feats = meta["features"]
+    X = pd.DataFrame([{f: payload.get(f, meta["medians"][f]) for f in feats}])[feats]
     proba = model.predict_proba(X)[0]
     classes = meta["classes"]
-    normal_idx = classes.index("Normal")
-    prob_fault = float(1 - proba[normal_idx])
-    diagnosis = classes[int(proba.argmax())]
-    missing = [f for f in meta["features"] if f not in payload]
-    note = (f"{len(missing)} of {len(meta['features'])} features defaulted to training "
-            f"medians (only provided: {sorted(set(meta['features']) - set(missing))[:5]}...)"
-            if missing else None)
-    return {"trained": True, "probability": round(prob_fault, 4), "risk_level": risk_level(prob_fault),
-            "alert": diagnosis != "Normal", "diagnosis": diagnosis, "note": note}
+    prob_fault = float(1 - proba[classes.index("normal")])
+    top = classes[int(proba.argmax())]
+    return {"trained": True, "probability": round(prob_fault, 4),
+            "risk_level": risk_level(prob_fault), "alert": prob_fault >= 0.5,
+            "diagnosis": None if top == "normal" else top.replace("_", " "),
+            "note": _defaulted_note(payload, feats)}
+
+
+def _score_robot(payload: dict, history: list[dict]) -> dict:
+    from pm_features import robot_features
+    model, meta = _load("robot_model.pkl", "robot_meta.pkl")
+    feats = robot_features(_history_frame(payload, history, meta["raw"], meta["medians"]))
+    X = feats.iloc[[-1]][meta["features"]]
+    prob = float(model.predict_proba(X)[0, 1])
+    return {"trained": True, "probability": round(prob, 4), "risk_level": risk_level(prob),
+            "alert": prob >= meta["threshold"],
+            "diagnosis": ("protective stop / grip loss likely within ~10 s"
+                          if prob >= meta["threshold"] else None),
+            "note": _defaulted_note(payload, meta["raw"])}
 
 
 def _score_wind_turbine(payload: dict, history: list[dict]) -> dict:
@@ -106,4 +173,10 @@ def score(machine_type: str, payload: dict, history: list[dict]) -> dict:
         return _score_bearing(payload)
     if machine_type == "wind_turbine_generator":
         return _score_wind_turbine(payload, history)
+    if machine_type == "hvac":
+        return _score_hvac(payload, history)
+    if machine_type == "robotic_arm":
+        return _score_robot(payload, history)
+    if machine_type == "conveyor":
+        return _score_conveyor(payload)
     raise ValueError(f"No scoring function wired up for trained type '{machine_type}'")

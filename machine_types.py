@@ -75,21 +75,24 @@ MACHINE_TYPES: dict[str, MachineType] = {
     "rotating_equipment": MachineType(
         key="rotating_equipment", name="Motor / Pump / Fan / Compressor / Gearbox",
         description="Any rotating machine whose dominant failure mode is bearing wear.",
-        dataset="CWRU bearing fault dataset (Case Western Reserve University, real induced-fault vibration experiments)",
+        dataset="University of Ottawa UORED-VAFCLS (doi:10.17632/y2px5tg92h.2): 20 real "
+                "bearings, each recorded healthy -> developing fault -> faulty",
         trained=True, model_path="bearing_model.pkl",
         sensors=[
-            SensorField("rms", "Vibration RMS", "g", 0.2, 3.0, 0.6),
-            SensorField("peak", "Vibration peak", "g", 0.5, 8.0, 2.0),
-            SensorField("crest", "Crest factor (peak/RMS)", "", 1.0, 6.0, 3.0),
-            SensorField("kurtosis", "Kurtosis (impulsiveness)", "", -1.0, 15.0, 0.0),
-            SensorField("spec_cent", "Spectral centroid", "Hz", 100, 1500, 700),
+            SensorField("rms", "Vibration RMS", "accel. units", 0.5, 120.0, 3.3),
+            SensorField("peak", "Vibration peak", "accel. units", 5.0, 900.0, 15.5),
+            SensorField("crest", "Crest factor (peak/RMS)", "", 1.0, 20.0, 4.6),
+            SensorField("kurtosis", "Kurtosis (impulsiveness, 0 = smooth)", "", -1.0, 40.0, 0.2),
+            SensorField("spec_cent", "Spectral centroid", "Hz", 500, 10000, 2900),
         ],
-        note="Trained on statistical features of a vibration waveform, which usually "
-             "come from an accelerometer + edge device, not a hand-typed value. The "
-             "5 fields above are the most predictive ones for a quick manual check; "
-             "a full CSV/API reading (rms, std, kurtosis, skewness, peak, p2p, crest, "
-             "shape, energy, spec_cent, spec_bw, spec_ent, band0-3, wE0-4, wS0-4) "
-             "scores more accurately. Diagnoses Normal vs Ball/Inner-race/Outer-race fault.",
+        note="Trained on features of an accelerometer waveform (42 kHz), which usually come "
+             "from a vibration sensor + edge device rather than being typed in. The 5 fields "
+             "above are the most useful for a quick manual check; a full CSV/API reading "
+             "(rms, std, peak, p2p, crest, kurtosis, skewness, shape, impulse, spec_cent, "
+             "spec_bw, spec_ent, band0-4) scores more accurately. Reports health state "
+             "(healthy / developing fault / faulty) and, once damaged, the likely defect "
+             "(inner race, outer race, ball, cage). Absolute RMS/peak depend on the sensor, "
+             "so calibrate against a known-healthy reading from the same sensor first.",
     ),
 
     "wind_turbine_generator": MachineType(
@@ -112,44 +115,77 @@ MACHINE_TYPES: dict[str, MachineType] = {
     ),
 
     "hvac": MachineType(
-        key="hvac", name="HVAC / Chiller / Compressor (climate)",
-        description="Not yet trained on real data.",
-        dataset="No real, publicly available failure-labeled dataset found. The one public "
-                "HVAC fault dataset is explicitly synthetic, so it isn't used here.",
-        trained=False,
+        key="hvac", name="HVAC Rooftop Unit (RTU)",
+        description="Packaged rooftop heating/cooling units -- the most common HVAC equipment "
+                    "in small commercial buildings. Detects economizer/damper and "
+                    "supply-air control faults from standard building-automation points.",
+        dataset="LBNL FDD Data Sets (U.S. DOE; LBNL/ORNL/NREL, DOI 10.25984/1881324) -- real "
+                "Trane 12.5-ton RTU at Oak Ridge National Laboratory with faults physically "
+                "imposed across four seasons",
+        trained=True, model_path="hvac_model.pkl",
         sensors=[
-            SensorField("suction_pressure", "Suction pressure", "psi", 50, 150, 100),
-            SensorField("discharge_pressure", "Discharge pressure", "psi", 150, 400, 250),
-            SensorField("suction_temp", "Suction temperature", "F", 30, 60, 45),
-            SensorField("compressor_current", "Compressor current", "A", 5, 60, 20),
+            SensorField("RTU_OA_TEMP", "Outside air temperature", "F", 0, 110, 69),
+            SensorField("RTU_MA_TEMP", "Mixed air temperature", "F", 40, 95, 68),
+            SensorField("RTU_RA_TEMP", "Return air temperature", "F", 55, 90, 70),
+            SensorField("RTU_SA_TEMP", "Supply air temperature", "F", 40, 90, 56),
+            SensorField("RTU_OA_DMPR_DM", "Outdoor-air damper command", "% open", 0, 100, 10),
+            SensorField("RTU_SA_FAN_WATT", "Supply fan power", "W", 0, 4000, 1780),
+            SensorField("RTU_COMP_WATT_1", "Compressor 1 power", "W", 0, 8000, 4200),
+            SensorField("RTU_COMP_WATT_2", "Compressor 2 power", "W", 0, 8000, 0),
+            SensorField("OCCU_MOD", "Occupied schedule (1 = yes, 0 = no)", "", 0, 1, 1),
+            SensorField("hour", "Hour of day", "h", 0, 23, 12),
         ],
-        note="Schema only. Needs a business's own maintenance history to train a real model.",
+        note="Faults only show while the unit is running, so readings during occupied "
+             "hours matter most. Rolling features build up from this unit's own recent "
+             "readings, so a steady feed (e.g. one reading per minute via the API) scores "
+             "far better than a single manual entry. Validated on one real unit; a "
+             "customer's own units should be spot-checked before relying on it.",
     ),
 
     "robotic_arm": MachineType(
-        key="robotic_arm", name="Industrial Robotic Arm",
-        description="Not yet trained on real data.",
-        dataset="No public failure-labeled dataset found for robotic arms.",
-        trained=False,
-        sensors=[
-            SensorField("joint_torque", "Joint torque", "Nm", 0, 200, 50),
-            SensorField("motor_current", "Motor current", "A", 0, 40, 10),
-            SensorField("servo_temp", "Servo temperature", "C", 20, 90, 45),
-        ],
-        note="Schema only. Needs a business's own maintenance history to train a real model.",
+        key="robotic_arm", name="Industrial Robotic Arm / Cobot",
+        description="6-axis robot arms. Warns ~10 seconds before a protective stop or "
+                    "gripper loss, from joint currents, temperatures and speeds.",
+        dataset="UR3 CobotOps, UCI Machine Learning Repository #963 -- real telemetry and "
+                "logged protective stops/grip losses from a Universal Robots UR3 cobot",
+        trained=True, model_path="robot_model.pkl",
+        sensors=(
+            [SensorField(f"Current_J{j}", f"Joint {j} current", "A", -6.0, 6.0, 0.0)
+             for j in range(6)]
+            + [SensorField(f"Temperature_J{j}", f"Joint {j} temperature", "C", 20, 70, 40)
+               for j in range(6)]
+            + [SensorField(f"Speed_J{j}", f"Joint {j} speed", "rad/s", -3.0, 3.0, 0.0)
+               for j in range(6)]
+            + [SensorField("Tool_current", "Gripper/tool current", "A", 0.0, 1.0, 0.085)]
+        ),
+        note="Expects about one reading per second from the robot controller (UR robots "
+             "expose these over RTDE/MODBUS). Rolling features use this robot's own last "
+             "~10 readings, so feed it continuously via the API. Validated on one UR3 "
+             "running one program -- retrain on a customer's own robot logs before relying on it.",
     ),
 
     "conveyor": MachineType(
-        key="conveyor", name="Conveyor / Belt System",
-        description="Not yet trained on real data.",
-        dataset="No public failure-labeled dataset found for conveyor systems.",
-        trained=False,
+        key="conveyor", name="Conveyor Drive (motor, shaft, bearings)",
+        description="The conveyor's drive train -- where most unplanned conveyor downtime "
+                    "starts. Detects bearing defects, shaft misalignment and rotor unbalance "
+                    "from one accelerometer on the drive.",
+        dataset="KAIST rotating-machine dataset (Jung et al., Data in Brief 2023, "
+                "doi:10.17632/ztmf3m7h5x.6) -- real test rig, faults at several severities "
+                "under 3 loads, order-tracked vibration",
+        trained=True, model_path="conveyor_model.pkl",
         sensors=[
-            SensorField("motor_current", "Drive motor current", "A", 0, 50, 15),
-            SensorField("belt_tension", "Belt tension", "N", 0, 5000, 2000),
-            SensorField("vibration_rms", "Vibration RMS", "g", 0, 3, 0.4),
+            SensorField("rms", "Vibration RMS", "g", 0.02, 1.5, 0.13),
+            SensorField("peak", "Vibration peak", "g", 0.05, 8.0, 0.45),
+            SensorField("crest", "Crest factor (peak/RMS)", "", 1.0, 15.0, 3.4),
+            SensorField("kurtosis", "Kurtosis (impulsiveness, 0 = smooth)", "", -1.5, 10.0, -0.2),
+            SensorField("order1_amp", "Vibration at 1x shaft speed", "g", 0.0, 0.003, 0.0004),
+            SensorField("band3", "High-frequency share (5-12.8 kHz)", "0-1", 0.0, 1.0, 0.2),
         ],
-        note="Schema only. Needs a business's own maintenance history to train a real model.",
+        note="Covers the drive train only -- NOT belt tears, belt mistracking or idler "
+             "failures (no reliable open dataset exists for those; the one real one, 135 "
+             "idlers recorded in a working mine, is access-restricted). Light unbalance "
+             "(under ~2 g of added mass on the test rig) is physically hard to see and is "
+             "usually missed. Validated on one test rig at three loads.",
     ),
 }
 
