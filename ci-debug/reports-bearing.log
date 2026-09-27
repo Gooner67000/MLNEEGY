@@ -1,0 +1,14 @@
+Loaded 9487 segments from 10 recordings.
+label
+Inner_Race    2848
+Outer_Race    2848
+Ball_Fault    2847
+Normal         944
+Name: count, dtype: int64
+
+Train: 6639 segments from 7 recordings
+Test:  2848 segments from 3 recordings (never trained on)
+
+Held-out recordings -- accuracy 0.3883  balanced accuracy 0.3882  macro F1 0.3124  any-fault recall 1.0000
+
+Saved bearing_model.pkl, bearing_meta.pkl; see reports/bearing_results.md

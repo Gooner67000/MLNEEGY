@@ -1,0 +1,13 @@
+Loaded 100 engines, 20631 readings (cycle 1 to failure for each engine).
+Train engines: 80 | Test engines (never trained on): 20
+
+Failure-soon rate: train 0.150, test 0.152
+
+Held-out engines -- ROC AUC 0.9914  PR AUC 0.9631  Precision 0.7350  Recall 0.9484
+
+Walk-forward replay across 20 held-out engines:
+  Alerted before failure: 20/20 engines
+  Never alerted in time:  0/20 engines
+  Lead time (cycles before failure at first alert): median 36, mean 42.8, min 21, max 109
+
+See reports/backtest_results.md

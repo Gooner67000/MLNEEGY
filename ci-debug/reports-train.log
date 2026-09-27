@@ -1,0 +1,93 @@
+   UDI Product ID Type  Air temperature [K]  ...  HDF  PWF  OSF  RNF
+0    1     M14860    M                298.1  ...    0    0    0    0
+1    2     L47181    L                298.2  ...    0    0    0    0
+2    3     L47182    L                298.1  ...    0    0    0    0
+3    4     L47183    L                298.2  ...    0    0    0    0
+4    5     L47184    L                298.2  ...    0    0    0    0
+
+[5 rows x 14 columns]
+Shape: (10000, 14)
+
+Missing values:
+ UDI                        0
+Product ID                 0
+Type                       0
+Air temperature [K]        0
+Process temperature [K]    0
+Rotational speed [rpm]     0
+Torque [Nm]                0
+Tool wear [min]            0
+Machine failure            0
+TWF                        0
+HDF                        0
+PWF                        0
+OSF                        0
+RNF                        0
+dtype: int64
+
+Failure rate: 3.39%
+
+Correlation with target:
+ Torque Nm                0.191321
+Strain                   0.190427
+Power W                  0.176039
+Tool wear min            0.105448
+Air temperature K        0.082556
+Process temperature K    0.035946
+Rotational speed rpm    -0.044188
+Temp diff K             -0.111676
+Name: Machine failure, dtype: float64
+
+Original class distribution:
+Machine failure
+0    9661
+1     339
+Name: count, dtype: int64
+Undersampled training distribution:
+Machine failure
+0    271
+1    271
+Name: count, dtype: int64
+Train: 8000 rows (542 undersampled) | Test: 2000 rows (3.40% failures)
+
+======================================================================
+MODEL COMPARISON
+======================================================================
+
+Tuned XGBoost: CV average precision = 0.8680
+Best params: {'subsample': 1.0, 'reg_lambda': 3, 'n_estimators': 500, 'min_child_weight': 1, 'max_depth': 6, 'learning_rate': 0.03, 'colsample_bytree': 0.85}
+Logistic Regression              CV AUC 0.9008 | Test AUC 0.9232 | PR AUC 0.4254 | P 0.158 R 0.853
+Random Forest                    CV AUC 0.9695 | Test AUC 0.9778 | PR AUC 0.6800 | P 0.264 R 0.956
+XGBoost                          CV AUC 0.9646 | Test AUC 0.9763 | PR AUC 0.7039 | P 0.291 R 0.941
+XGBoost tuned (class-weighted)   CV AUC 0.9782 | Test AUC 0.9855 | PR AUC 0.8877 | P 0.864 R 0.838
+Chosen threshold for recall >= 0.85: 0.2791
+
+FINAL MODEL @ threshold 0.279
+TN=1903  FP=29
+FN=10  TP=58
+roc_auc    0.9855
+pr_auc     0.8877
+accuracy   0.9805
+precision  0.6667
+recall     0.8529
+f1         0.7484
+
+Threshold  Precision  Recall
+  0.279    0.6667    0.8529
+  0.300    0.6744    0.8529
+  0.500    0.8636    0.8382
+  0.700    0.9322    0.8088
+
+Permutation importance:
+               Feature  Importance      Std
+ Rotational speed rpm    0.388124 0.032489
+          Temp diff K    0.280024 0.026705
+               Strain    0.156327 0.009595
+              Power W    0.141043 0.010332
+                 Type    0.070816 0.029842
+        Tool wear min    0.052207 0.005118
+            Torque Nm    0.038433 0.005464
+    Air temperature K    0.002061 0.005909
+Process temperature K   -0.003574 0.004383
+
+Model saved as 'predictive_maintenance_model.pkl'; see reports/results.md
