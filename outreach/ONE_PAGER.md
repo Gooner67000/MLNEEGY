@@ -18,8 +18,8 @@ Every result below was measured on machines the model had **never seen** during 
   a median of **36 operating cycles** ahead.
 - **Wind turbines / generators:** 0.999 ROC AUC on real wind-farm data from turbines it
   never trained on.
-- **Conveyor drives:** caught every bearing fault on a real test rig, at an operating load
-  it had never seen.
+- **Conveyor drives:** on a real test rig, at an operating load it had never seen, caught
+  about 90% of bearing faults with just 1% false alarms on normal running.
 
 ## How a pilot works (no commitment)
 

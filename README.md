@@ -23,7 +23,7 @@ Results below are all on held-out data. Full reports are in [`reports/`](reports
 | **Gas / jet turbine** | NASA C-MAPSS run-to-failure | 20/20 engines alerted, median 36 cycles early | ✅ validated |
 | **Wind turbine / generator** | Real wind-farm SCADA | ROC AUC 0.999 on held-out turbines | ✅ validated |
 | **CNC / lathe / mill** | AI4I2020 (modeled snapshot, no timeline) | ROC AUC 0.986, recall 85% | ✅ validated* |
-| **Conveyor drive** (motor, shaft, bearings) | KAIST rig (*Data in Brief* 2023), vibration | Bearing faults 100%, misalignment ≥91% at an unseen load; see report for false-alarm rate | ✅ validated† |
+| **Conveyor drive** (motor, shaft, bearings) | KAIST rig (*Data in Brief* 2023), vibration | At an unseen load with 1% false alarms: bearing faults ~90%, moderate/heavy misalignment 91–100%; light misalignment and unbalance mostly missed | ✅ validated† |
 | **HVAC rooftop unit** | DOE/LBNL — real Trane 12.5-ton unit at Oak Ridge Nat'l Lab | Only ~1 in 5 fault days caught at a 20% false-alarm cap; economizer faults missed | ⚠️ experimental |
 | **Robotic arm / cobot** | UCI UR3 CobotOps — real UR3 telemetry | Warned before 17/24 grip losses, but only ~1 in 5 alerts real | ⚠️ experimental |
 
