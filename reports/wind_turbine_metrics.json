@@ -1,0 +1,21 @@
+{
+  "dataset": "Real wind-farm SCADA telemetry (subsampled, streamed from real source)",
+  "n_rows": 18000,
+  "n_turbines": 12,
+  "n_train_turbines": 8,
+  "n_test_turbines": 4,
+  "roc_auc": 0.9985084405212118,
+  "pr_auc": 0.9960313997881652,
+  "precision": 0.9947368421052631,
+  "recall": 0.9895287958115183,
+  "confusion_matrix": {
+    "tn": 5616,
+    "fp": 2,
+    "fn": 4,
+    "tp": 378
+  },
+  "lead_time_rows": {
+    "n_events": 378,
+    "median": 32.0
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "dataset": "CWRU bearing fault (real induced-fault vibration experiments)",
+  "n_segments": 9487,
+  "n_recordings": 10,
+  "n_train_recordings": 7,
+  "n_test_recordings": 3,
+  "accuracy": 0.3883426966292135,
+  "balanced_accuracy": 0.38816575113446383,
+  "macro_f1": 0.31240357737102437,
+  "any_fault_recall": 1.0,
+  "top_features": [
+    {
+      "Feature": "spec_cent",
+      "Importance": 0.1110428370786517
+    },
+    {
+      "Feature": "spec_bw",
+      "Importance": 0.0991485252808989
+    },
+    {
+      "Feature": "band1",
+      "Importance": 0.08045119382022473
+    },
+    {
+      "Feature": "rms",
+      "Importance": 0.005530196629213509
+    },
+    {
+      "Feature": "kurtosis",
+      "Importance": 0.002589536516853945
+    },
+    {
+      "Feature": "band0",
+      "Importance": 0.0023261938202247465
+    },
+    {
+      "Feature": "shape",
+      "Importance": 0.0023261938202247257
+    },
+    {
+      "Feature": "wE0",
+      "Importance": 0.00035112359550563965
+    },
+    {
+      "Feature": "crest",
+      "Importance": 4.389044943820669e-05
+    },
+    {
+      "Feature": "energy",
+      "Importance": 0.0
+    }
+  ]
+}
