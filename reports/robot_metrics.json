@@ -1,0 +1,18 @@
+{
+  "dataset": "UR3 CobotOps (UCI #963), real Universal Robots UR3 telemetry",
+  "validation": "chronological walk-forward: first 70% train, last 30% test, 10-reading gap",
+  "target": "protective stop or grip loss starts within next 10 readings",
+  "roc_auc": 0.6673144151227014,
+  "pr_auc": 0.18954413860464425,
+  "pr_auc_random_baseline": 0.09578898658028691,
+  "precision": 0.22145328719723184,
+  "recall": 0.30917874396135264,
+  "threshold": 0.5,
+  "events_in_test": 24,
+  "events_warned": 17,
+  "median_warning_readings": 7.0,
+  "by_type": {
+    "protective_stop": "0/0",
+    "grip_lost": "17/24"
+  }
+}

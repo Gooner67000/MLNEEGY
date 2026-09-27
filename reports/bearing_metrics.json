@@ -1,53 +1,16 @@
 {
-  "dataset": "CWRU bearing fault (real induced-fault vibration experiments)",
-  "n_segments": 9487,
-  "n_recordings": 10,
-  "n_train_recordings": 7,
-  "n_test_recordings": 3,
-  "accuracy": 0.3883426966292135,
-  "balanced_accuracy": 0.38816575113446383,
-  "macro_f1": 0.31240357737102437,
-  "any_fault_recall": 1.0,
-  "top_features": [
-    {
-      "Feature": "spec_cent",
-      "Importance": 0.1110428370786517
-    },
-    {
-      "Feature": "spec_bw",
-      "Importance": 0.0991485252808989
-    },
-    {
-      "Feature": "band1",
-      "Importance": 0.08045119382022473
-    },
-    {
-      "Feature": "rms",
-      "Importance": 0.005530196629213509
-    },
-    {
-      "Feature": "kurtosis",
-      "Importance": 0.002589536516853945
-    },
-    {
-      "Feature": "band0",
-      "Importance": 0.0023261938202247465
-    },
-    {
-      "Feature": "shape",
-      "Importance": 0.0023261938202247257
-    },
-    {
-      "Feature": "wE0",
-      "Importance": 0.00035112359550563965
-    },
-    {
-      "Feature": "crest",
-      "Importance": 4.389044943820669e-05
-    },
-    {
-      "Feature": "energy",
-      "Importance": 0.0
-    }
-  ]
+  "dataset": "University of Ottawa UORED-VAFCLS, doi:10.17632/y2px5tg92h.2",
+  "validation": "leave-bearings-out, 5 folds (4 physical bearings held out per fold)",
+  "n_windows": 1200,
+  "n_recordings": 60,
+  "n_bearings": 20,
+  "healthy_vs_damaged_roc_auc": 0.9409687500000001,
+  "developing_fault_windows_flagged": 0.84,
+  "faulty_windows_flagged": 0.925,
+  "healthy_windows_false_alarm": 0.08,
+  "state_macro_f1": 0.5904351915540874,
+  "recording_state_accuracy": 0.6,
+  "developing_recordings_flagged": "17/20",
+  "healthy_recordings_false_alarm": "1/20",
+  "fault_type_accuracy_damaged_windows": 0.5625
 }

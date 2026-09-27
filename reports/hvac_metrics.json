@@ -1,0 +1,29 @@
+{
+  "dataset": "LBNL FDD Data Sets - ORNL experimental RTU (real Trane YCD150), DOI 10.25984/1881324",
+  "validation": "leave-one-season-out (4 folds); alert threshold chosen by nested leave-one-season-out inside the training seasons only",
+  "max_false_alarm_budget": 0.2,
+  "per_season_threshold": {
+    "Fall_2020": 0.9998460412025452,
+    "Spring_2021": 0.7948147058486938,
+    "Summer_2021": 0.9991843700408936,
+    "Winter_2022": 0.7832729816436768
+  },
+  "day_level_roc_auc": 0.6160714285714285,
+  "n_minutes": 89280,
+  "n_unit_days": 62,
+  "minute_roc_auc_occupied": 0.6137528043509553,
+  "minute_pr_auc_occupied": 0.8629334085725622,
+  "minute_roc_auc_all_hours": 0.5596885854282637,
+  "fault_days": 48,
+  "fault_days_flagged": 9,
+  "fault_free_days": 14,
+  "false_alarm_days": 0,
+  "per_fault_day_recall": {
+    "economizer_setpoint": 0.0,
+    "oa_damper_stuck": 0.375,
+    "sa_temp_sensor_bias": 0.1875
+  },
+  "diagnosis_macro_f1_minutes": 0.4810556904139246,
+  "diagnosis_accuracy_fault_days": 0.5833333333333334,
+  "median_detection_minutes_after_0700": 0.5
+}
