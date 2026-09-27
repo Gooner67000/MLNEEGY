@@ -48,20 +48,33 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
+      # Every `| tee` step below sets pipefail explicitly rather than relying
+      # on the runner's default shell behavior: without it, a script that
+      # crashes mid-run still reports the step as successful (tee, the last
+      # command in the pipe, exits 0), silently producing partial/missing
+      # output files that only surface as a confusing failure much later.
       - name: Train model (steps 2-7)
-        run: python train.py | tee reports-train.log
+        run: |
+          set -euo pipefail
+          python train.py | tee reports-train.log
 
       - name: Score sample machines (step 8)
         run: python predict.py
 
       - name: Walk-forward backtest on real run-to-failure data (no lookahead)
-        run: python backtest.py | tee reports-backtest.log
+        run: |
+          set -euo pipefail
+          python backtest.py | tee reports-backtest.log
 
       - name: Train bearing / rotating-equipment model (real CWRU data)
-        run: python train_bearing.py | tee reports-bearing.log
+        run: |
+          set -euo pipefail
+          python train_bearing.py | tee reports-bearing.log
 
       - name: Train wind turbine / generator model (real SCADA data)
-        run: python train_wind_turbine.py | tee reports-wind-turbine.log
+        run: |
+          set -euo pipefail
+          python train_wind_turbine.py | tee reports-wind-turbine.log
         timeout-minutes: 15
 
       - name: Run tests (incl. leakage guards, backend API, headless Streamlit app)
@@ -101,12 +114,18 @@ jobs:
       # with this training job.
       - name: Package trained models for the Docker smoke test
         run: |
+          set -euo pipefail
           mkdir -p _artifact_payload
-          cp predictive_maintenance_model.pkl feature_names.pkl model_meta.json \
-             backtest_model.pkl turbine_meta.pkl \
-             bearing_model.pkl bearing_meta.pkl \
-             wind_turbine_model.pkl wind_turbine_meta.pkl \
-             _artifact_payload/
+          for f in predictive_maintenance_model.pkl feature_names.pkl model_meta.json \
+                   backtest_model.pkl turbine_meta.pkl \
+                   bearing_model.pkl bearing_meta.pkl \
+                   wind_turbine_model.pkl wind_turbine_meta.pkl; do
+            if [ ! -f "$f" ]; then
+              echo "::error::$f is missing -- an earlier training step did not actually produce it, even though it reported success (likely masked by a pipefail issue). Check that step's full log."
+              exit 1
+            fi
+            cp "$f" _artifact_payload/
+          done
 
       - uses: actions/upload-artifact@v4
         with:
@@ -149,6 +168,7 @@ jobs:
 
       - name: Smoke-test the actual downloadable Docker stack
         run: |
+          set -euo pipefail
           docker compose up -d --build
           for i in $(seq 1 30); do
             curl -sf http://localhost:8000/health && break
