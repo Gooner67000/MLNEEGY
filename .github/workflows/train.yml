@@ -8,6 +8,11 @@ on:
       - "predict.py"
       - "app.py"
       - "backtest.py"
+      - "train_bearing.py"
+      - "train_wind_turbine.py"
+      - "machine_types.py"
+      - "backend/**"
+      - "frontend/**"
       - "tests/**"
       - "requirements*.txt"
       - "data/**"
@@ -46,14 +51,24 @@ jobs:
       - name: Walk-forward backtest on real run-to-failure data (no lookahead)
         run: python backtest.py | tee reports-backtest.log
 
-      - name: Run tests (incl. leakage guards + headless Streamlit app)
+      - name: Train bearing / rotating-equipment model (real CWRU data)
+        run: python train_bearing.py | tee reports-bearing.log
+
+      - name: Train wind turbine / generator model (real SCADA data)
+        run: python train_wind_turbine.py | tee reports-wind-turbine.log
+        timeout-minutes: 20
+
+      - name: Run tests (incl. leakage guards, backend API, headless Streamlit app)
         run: python -m pytest -v
 
       - name: Execute notebook
         run: jupyter nbconvert --to notebook --execute --inplace notebooks/01_eda_modeling.ipynb
 
       - name: Job summary
-        run: cat reports/results.md reports/backtest_results.md >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          cat reports/results.md reports/backtest_results.md \
+              reports/bearing_results.md reports/wind_turbine_results.md \
+              >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -62,15 +77,56 @@ jobs:
             reports/
             reports-train.log
             reports-backtest.log
+            reports-bearing.log
+            reports-wind-turbine.log
 
-      - name: Commit trained model and reports
+      - name: Commit trained models, reports, and real-data caches
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add predictive_maintenance_model.pkl feature_names.pkl model_meta.json backtest_model.pkl reports/ notebooks/ data/cmapss_train_FD001.csv
+          git add \
+            predictive_maintenance_model.pkl feature_names.pkl model_meta.json \
+            backtest_model.pkl turbine_meta.pkl \
+            bearing_model.pkl bearing_meta.pkl \
+            wind_turbine_model.pkl wind_turbine_meta.pkl \
+            reports/ notebooks/ \
+            data/cmapss_train_FD001.csv data/cwru_features_all_segments.csv \
+            data/cwru_dataset_file_log.csv data/wind_turbine_subsample.csv
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Update trained model and reports [skip ci]"
+            git commit -m "Update trained models and reports [skip ci]"
             git push
           fi
+
+      - name: Smoke-test the actual downloadable Docker stack
+        run: |
+          docker compose up -d --build
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/health && break
+            sleep 2
+          done
+          curl -sf http://localhost:8000/health
+          TOKEN=$(curl -sf -X POST http://localhost:8000/auth/register \
+            -H "Content-Type: application/json" \
+            -d '{"name":"CI Smoke Test","email":"ci@example.com","password":"password123"}' \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
+          MACHINE_ID=$(curl -sf -X POST http://localhost:8000/machines \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+            -d '{"name":"Mill-CI","machine_type":"cnc_machine_tool"}' \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+          curl -sf -X POST "http://localhost:8000/machines/$MACHINE_ID/readings" \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+            -d '{"payload":{"Type":0,"Air temperature K":300,"Process temperature K":310,"Rotational speed rpm":1500,"Torque Nm":40,"Tool wear min":100},"source":"api"}' \
+            | tee /tmp/reading.json
+          python3 -c "
+          import json
+          r = json.load(open('/tmp/reading.json'))
+          assert r['trained'] is True
+          assert 0 <= r['probability'] <= 1, r
+          assert r['risk_level'] in ('Low', 'Medium', 'High')
+          print('Docker stack smoke test passed:', r)
+          "
+          curl -sf http://localhost:8501 > /dev/null && echo "Frontend responding"
+          docker compose logs --tail=50
+          docker compose down -v

@@ -296,6 +296,14 @@ failed, using only data available at the time.
 """
     (REPORTS / "backtest_results.md").write_text(md, encoding="utf-8")
     joblib.dump(model, ROOT / "backtest_model.pkl")
+    live_sensors = [c for c in feature_cols if c.startswith("sensor_") and
+                    not (c.endswith("_roll_mean") or c.endswith("_delta"))]
+    joblib.dump({
+        "features": feature_cols,
+        "raw_sensor_cols": ["cycle"] + live_sensors,
+        "live_sensors": live_sensors,
+        "roll_window": ROLL_WINDOW,
+    }, ROOT / "turbine_meta.pkl")
     print("\nSee reports/backtest_results.md")
 
 

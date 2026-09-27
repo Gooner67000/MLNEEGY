@@ -1,0 +1,36 @@
+# Downloadable, self-contained deployment: `docker compose up` and it's
+# running entirely inside your own network -- no data leaves this machine.
+#
+# To point this same stack at a hosted database instead of the local
+# SQLite file (e.g. to run it as a multi-tenant hosted service), set
+# DATABASE_URL and SECRET_KEY in a .env file next to this compose file;
+# nothing else about the backend or frontend needs to change.
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////app/data/app.db}
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-.env}
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "8501:8501"
+    environment:
+      API_BASE: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
