@@ -70,6 +70,8 @@ PER_ASSET_CAP = 1500          # rows kept per turbine
 N_ASSETS_TARGET = 15          # number of spread-out points sampled across the file
 OFFSET_CHUNK_BYTES = 10_000_000  # ~10MB per sample point -> comfortably > PER_ASSET_CAP rows
 REQUEST_TIMEOUT = (15, 60)    # (connect, read) seconds -- fail loud instead of hanging
+ROLL_WINDOW = 6                # backward-only rolling window, in readings
+SEED = 42
 
 
 def fetch_range(start: int, length: int) -> bytes:
