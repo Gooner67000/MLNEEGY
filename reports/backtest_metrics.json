@@ -1,0 +1,26 @@
+{
+  "dataset": "NASA C-MAPSS FD001 (real run-to-failure turbofan simulations)",
+  "n_engines_total": 100,
+  "n_engines_train": 80,
+  "n_engines_test": 20,
+  "horizon_cycles": 30,
+  "threshold": 0.5,
+  "roc_auc": 0.9913842917251053,
+  "pr_auc": 0.9630750943809814,
+  "precision": 0.735,
+  "recall": 0.9483870967741935,
+  "confusion_matrix": {
+    "tn": 3238,
+    "fp": 212,
+    "fn": 32,
+    "tp": 588
+  },
+  "engines_alerted_in_time": 20,
+  "engines_never_alerted": 0,
+  "lead_time_cycles": {
+    "median": 35.5,
+    "mean": 42.8,
+    "min": 21,
+    "max": 109
+  }
+}
