@@ -77,6 +77,23 @@ jobs:
           python train_wind_turbine.py | tee reports-wind-turbine.log
         timeout-minutes: 15
 
+      # Runs even if an earlier step failed. Artifact downloads and the raw
+      # log viewer both require a signed-in GitHub session even on a public
+      # repo, so a genuine failure's traceback was invisible to anyone
+      # without repo access -- committing the log as a normal tracked file
+      # makes it readable by anyone with `git pull`, no sign-in needed.
+      - name: On failure, commit whatever logs exist so the error is readable without signing in to GitHub
+        if: failure()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p ci-debug
+          cp reports-*.log ci-debug/ 2>/dev/null || true
+          echo "Run: $GITHUB_RUN_ID  Commit: $GITHUB_SHA  $(date -u)" > ci-debug/run-info.txt
+          git add -f ci-debug/
+          git commit -m "CI debug logs from failed run $GITHUB_RUN_ID [skip ci]" || true
+          git push || true
+
       - name: Run tests (incl. leakage guards, backend API, headless Streamlit app)
         run: python -m pytest -v
 
