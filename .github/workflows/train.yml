@@ -56,7 +56,7 @@ jobs:
       - name: Train model (steps 2-7)
         run: |
           set -euo pipefail
-          python train.py | tee reports-train.log
+          python train.py 2>&1 | tee reports-train.log
 
       - name: Score sample machines (step 8)
         run: python predict.py
@@ -64,17 +64,17 @@ jobs:
       - name: Walk-forward backtest on real run-to-failure data (no lookahead)
         run: |
           set -euo pipefail
-          python backtest.py | tee reports-backtest.log
+          python backtest.py 2>&1 | tee reports-backtest.log
 
       - name: Train bearing / rotating-equipment model (real CWRU data)
         run: |
           set -euo pipefail
-          python train_bearing.py | tee reports-bearing.log
+          python train_bearing.py 2>&1 | tee reports-bearing.log
 
       - name: Train wind turbine / generator model (real SCADA data)
         run: |
           set -euo pipefail
-          python train_wind_turbine.py | tee reports-wind-turbine.log
+          python train_wind_turbine.py 2>&1 | tee reports-wind-turbine.log
         timeout-minutes: 15
 
       # Runs even if an earlier step failed. Artifact downloads and the raw
