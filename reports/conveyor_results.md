@@ -13,45 +13,46 @@ their features tracked a 48 vs 49 Hz supply difference between recording session
 faults.
 
 **Leakage guard -- leave-one-load-out:** each load level is scored by a model trained only on
-the other two.
+the other two. The alert threshold was chosen without the held-out load too (nested, on the
+training loads only), targeting at most 20% false alarms on normal running.
 
 | Metric (load never seen in training) | Value |
 |---|---|
 | Fault vs. normal ROC AUC | 0.877 |
-| Fault windows flagged | 96% |
-| False alarms on normal running | 77% |
-| Recordings correctly diagnosed (majority vote) | 37 / 45 |
-| Diagnosis macro F1 (5 classes) | 0.715 |
+| Fault windows flagged | 54% |
+| False alarms on normal running | 1% |
+| Recordings correctly diagnosed (majority vote) | 27 / 45 |
+| Diagnosis macro F1 (5 classes) | 0.662 |
 
 Per class (window accuracy):
 
 | Class | Correct |
 |---|---|
-| normal | 28% |
-| unbalance | 59% |
-| misalignment | 88% |
-| bearing_inner | 100% |
-| bearing_outer | 97% |
+| normal | 99% |
+| unbalance | 16% |
+| misalignment | 71% |
+| bearing_inner | 91% |
+| bearing_outer | 89% |
 
 Flag rate by fault severity -- the honest picture of what it can and can't catch:
 
 | Fault | Severity | Flagged |
 |---|---|---|
-| bearing_inner | 03 | 100% |
-| bearing_inner | 10 | 100% |
-| bearing_inner | 30 | 100% |
-| bearing_outer | 03 | 100% |
-| bearing_outer | 10 | 100% |
-| bearing_outer | 30 | 100% |
-| misalignment | 01 | 91% |
-| misalignment | 03 | 100% |
+| bearing_inner | 03 | 89% |
+| bearing_inner | 10 | 92% |
+| bearing_inner | 30 | 91% |
+| bearing_outer | 03 | 77% |
+| bearing_outer | 10 | 99% |
+| bearing_outer | 30 | 97% |
+| misalignment | 01 | 22% |
+| misalignment | 03 | 91% |
 | misalignment | 05 | 100% |
-| normal | none | 77% |
-| unbalance | 0583mg | 79% |
-| unbalance | 1169mg | 91% |
-| unbalance | 1751mg | 94% |
-| unbalance | 2239mg | 97% |
-| unbalance | 3318mg | 100% |
+| normal | none | 1% |
+| unbalance | 0583mg | 11% |
+| unbalance | 1169mg | 13% |
+| unbalance | 1751mg | 26% |
+| unbalance | 2239mg | 30% |
+| unbalance | 3318mg | 32% |
 
 Physically, small unbalance barely changes vibration (1x amplitude only rises clearly from
 ~2.2 g of added mass up), so light unbalance is expected to be missed.
