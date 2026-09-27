@@ -45,7 +45,8 @@ def main():
         for _ in range(3):
             r = call("POST", f"/machines/{m['id']}/readings",
                      {"payload": reading, "source": "api"}, token)
-        ok = r["trained"] is True and r["probability"] is not None and 0 <= r["probability"] <= 1
+        ok = (r["trained"] is True and r["probability"] is not None and 0 <= r["probability"] <= 1
+              and (r["risk_level"] == "High") == bool(r["alert"]))
         print(f"{'OK ' if ok else 'BAD'} {key:24s} p={r['probability']} risk={r['risk_level']} "
               f"diagnosis={r['diagnosis']}")
         if not ok:

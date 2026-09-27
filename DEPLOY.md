@@ -48,6 +48,13 @@ database. You need a Render account. Sign in with GitHub. It's free to start, an
    `PUBLIC_API_BASE`, and save. The web app redeploys by itself.
 5. Open the `pm-frontend` URL and register your business.
 
+**If the app loads but can't log in or register:** check **pm-frontend → Environment**.
+`API_BASE` and `PUBLIC_API_BASE` must both be set to the backend's real URL. If they were
+left blank during setup, the web app looks for the API on `localhost` and can't find it.
+
+**If a code change doesn't show up:** open the service → **Manual Deploy → Deploy latest
+commit**. A service whose last deploy failed may not pick up new pushes on its own.
+
 What's already secured:
 - `SECRET_KEY` is generated randomly by Render. The backend also runs with
   `PM_ENV=production`, which **refuses to start** if the secret is weak or left at its

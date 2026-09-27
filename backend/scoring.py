@@ -17,12 +17,15 @@ import machine_types as mt
 ROOT = Path(__file__).parent.parent
 
 
-def risk_level(prob: float) -> str:
-    if prob < 0.3:
-        return "Low"
-    if prob < 0.7:
+def risk_level(prob: float, threshold: float = 0.5) -> str:
+    """Relative to each model's own validated alert threshold, so "High" always
+    means the alert fired. (Fixed 0.3/0.7 buckets were misleading: the conveyor
+    model's calibrated threshold is ~0.95, so normal running scored "High".)"""
+    if prob >= threshold:
+        return "High"
+    if prob >= 0.6 * threshold:
         return "Medium"
-    return "High"
+    return "Low"
 
 
 @lru_cache(maxsize=None)
@@ -43,7 +46,7 @@ def _score_cnc(payload: dict) -> dict:
     row = {k: payload.get(k, 0) for k in cnc.RAW_FEATURES}
     X = cnc.add_features(pd.DataFrame([row]))[feature_names]
     prob = float(model.predict_proba(X)[0, 1])
-    return {"trained": True, "probability": round(prob, 4), "risk_level": risk_level(prob),
+    return {"trained": True, "probability": round(prob, 4), "risk_level": risk_level(prob, threshold),
             "alert": prob >= threshold, "diagnosis": None, "note": None}
 
 
@@ -58,7 +61,7 @@ def _score_turbine(payload: dict, history: list[dict]) -> dict:
         row[f"{c}_delta"] = row[c] - (past[-1][c] if past else row[c])
     X = pd.DataFrame([row])[meta["features"]]
     prob = float(model.predict_proba(X)[0, 1])
-    return {"trained": True, "probability": round(prob, 4), "risk_level": risk_level(prob),
+    return {"trained": True, "probability": round(prob, 4), "risk_level": risk_level(prob, 0.5),
             "alert": prob >= 0.5, "diagnosis": None, "note": None}
 
 
@@ -85,7 +88,7 @@ def _score_bearing(payload: dict) -> dict:
         defect = meta["type_classes"][int(type_model.predict(X)[0])]
         diagnosis = f"{state} fault (likely {defect.replace('_', ' ')})"
     return {"trained": True, "probability": round(prob_damaged, 4),
-            "risk_level": risk_level(prob_damaged), "alert": state != "healthy",
+            "risk_level": "High" if state != "healthy" else risk_level(prob_damaged), "alert": state != "healthy",
             "diagnosis": diagnosis, "note": _defaulted_note(payload, feats)}
 
 
@@ -117,7 +120,7 @@ def _score_hvac(payload: dict, history: list[dict]) -> dict:
         classes = meta["classes"]
         p[classes.index("fault_free")] = 0  # we already know it's a fault; name the likeliest one
         diagnosis = classes[int(p.argmax())].replace("_", " ")
-    return {"trained": True, "probability": round(prob, 4), "risk_level": risk_level(prob),
+    return {"trained": True, "probability": round(prob, 4), "risk_level": risk_level(prob, meta["threshold"]),
             "alert": alert, "diagnosis": diagnosis,
             "note": _defaulted_note(payload, [c for c in meta["raw"] if c != "hour"])}
 
@@ -133,7 +136,7 @@ def _score_conveyor(payload: dict) -> dict:
     p = proba.copy()
     p[classes.index("normal")] = 0
     return {"trained": True, "probability": round(prob_fault, 4),
-            "risk_level": risk_level(prob_fault), "alert": alert,
+            "risk_level": risk_level(prob_fault, meta.get("threshold", 0.5)), "alert": alert,
             "diagnosis": classes[int(p.argmax())].replace("_", " ") if alert else None,
             "note": _defaulted_note(payload, feats)}
 
@@ -146,7 +149,7 @@ def _score_custom(machine_type: str, payload: dict, history: list[dict]) -> dict
     feats = generic_features(frame, meta["raw"], meta["roll"], meta["long_roll"])
     X = feats.iloc[[-1]][meta["features"]]
     prob = float(model.predict_proba(X)[0, 1])
-    return {"trained": True, "probability": round(prob, 4), "risk_level": risk_level(prob),
+    return {"trained": True, "probability": round(prob, 4), "risk_level": risk_level(prob, meta["threshold"]),
             "alert": prob >= meta["threshold"],
             "diagnosis": (f"failure likely within {meta['horizon']}"
                           if prob >= meta["threshold"] else None),
@@ -159,7 +162,7 @@ def _score_robot(payload: dict, history: list[dict]) -> dict:
     feats = robot_features(_history_frame(payload, history, meta["raw"], meta["medians"]))
     X = feats.iloc[[-1]][meta["features"]]
     prob = float(model.predict_proba(X)[0, 1])
-    return {"trained": True, "probability": round(prob, 4), "risk_level": risk_level(prob),
+    return {"trained": True, "probability": round(prob, 4), "risk_level": risk_level(prob, meta["threshold"]),
             "alert": prob >= meta["threshold"],
             "diagnosis": ("protective stop / grip loss likely within ~10 s"
                           if prob >= meta["threshold"] else None),
@@ -176,7 +179,7 @@ def _score_wind_turbine(payload: dict, history: list[dict]) -> dict:
         row[f"{c}_roll"] = sum(recent) / len(recent)
     X = pd.DataFrame([row])[meta["features"]]
     prob = float(model.predict_proba(X)[0, 1])
-    return {"trained": True, "probability": round(prob, 4), "risk_level": risk_level(prob),
+    return {"trained": True, "probability": round(prob, 4), "risk_level": risk_level(prob, 0.5),
             "alert": prob >= 0.5, "diagnosis": None, "note": None}
 
 

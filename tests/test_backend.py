@@ -174,6 +174,9 @@ def _score(token, machine_id, payload) -> dict:
     assert body["trained"] is True
     assert 0 <= body["probability"] <= 1
     assert body["risk_level"] in ("Low", "Medium", "High")
+    # "High" must mean exactly "the validated alert fired" -- never a scary
+    # label on a reading the model itself doesn't alert on.
+    assert (body["risk_level"] == "High") == bool(body["alert"]), body
     return body
 
 
