@@ -33,6 +33,10 @@ class MachineType:
     model_path: str = ""
     sensors: list[SensorField] = field(default_factory=list)
     note: str = ""         # shown in the UI, esp. for untrained types
+    # "validated" = held-out results strong enough to show a customer;
+    # "experimental" = trained on real data but held-out results are weak --
+    # the UI says so, and it should only be offered as a pilot.
+    maturity: str = "validated"
 
 
 MACHINE_TYPES: dict[str, MachineType] = {
@@ -135,7 +139,12 @@ MACHINE_TYPES: dict[str, MachineType] = {
             SensorField("OCCU_MOD", "Occupied schedule (1 = yes, 0 = no)", "", 0, 1, 1),
             SensorField("hour", "Hour of day", "h", 0, 23, 12),
         ],
-        note="Faults only show while the unit is running, so readings during occupied "
+        maturity="experimental",
+        note="EXPERIMENTAL: on held-out seasons it caught only ~1 in 5 fault days (with no "
+             "false alarms) and missed economizer-setpoint faults entirely -- many imposed "
+             "faults are physically invisible on days the economizer doesn't run. Offer only "
+             "as a pilot validated on the customer's own units. "
+             "Faults only show while the unit is running, so readings during occupied "
              "hours matter most. Rolling features build up from this unit's own recent "
              "readings, so a steady feed (e.g. one reading per minute via the API) scores "
              "far better than a single manual entry. Validated on one real unit; a "
@@ -158,7 +167,11 @@ MACHINE_TYPES: dict[str, MachineType] = {
                for j in range(6)]
             + [SensorField("Tool_current", "Gripper/tool current", "A", 0.0, 1.0, 0.085)]
         ),
-        note="Expects about one reading per second from the robot controller (UR robots "
+        maturity="experimental",
+        note="EXPERIMENTAL: on the robot's later, unseen timeline it warned before 17 of 24 "
+             "grip losses, but only ~1 in 5 alerts was followed by a real event, and no "
+             "protective stops occurred in that period to test on. Offer only as a pilot. "
+             "Expects about one reading per second from the robot controller (UR robots "
              "expose these over RTDE/MODBUS). Rolling features use this robot's own last "
              "~10 readings, so feed it continuously via the API. Validated on one UR3 "
              "running one program -- retrain on a customer's own robot logs before relying on it.",
@@ -202,7 +215,8 @@ def _load_custom_types() -> None:
             key=spec["key"], name=spec["name"], description=spec["description"],
             dataset=spec["dataset"], trained=True,
             model_path=str(spec_path.parent.relative_to(ROOT) / "model.pkl"),
-            sensors=[SensorField(**s) for s in spec["sensors"]], note=spec.get("note", ""))
+            sensors=[SensorField(**s) for s in spec["sensors"]], note=spec.get("note", ""),
+            maturity=spec.get("maturity", "experimental"))
 
 
 _load_custom_types()

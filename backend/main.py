@@ -62,7 +62,7 @@ def list_machine_types():
     return {
         key: {
             "name": t.name, "description": t.description, "dataset": t.dataset,
-            "trained": t.trained, "note": t.note,
+            "trained": t.trained, "note": t.note, "maturity": t.maturity,
             "sensors": [s.__dict__ for s in t.sensors],
         }
         for key, t in mt.MACHINE_TYPES.items()

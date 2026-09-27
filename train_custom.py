@@ -173,8 +173,11 @@ def main():
                  "medians": medians, "threshold": THRESHOLD, "horizon": str(horizon)},
                 out / "meta.pkl")
     ranges = {c: (float(df[c].quantile(0.01)), float(df[c].quantile(0.99))) for c in sensors}
+    # Only call it "validated" if the held-out results would survive a customer's scrutiny.
+    maturity = ("validated" if roc == roc and roc >= 0.8 and total and warned / total >= 0.5
+                else "experimental")
     (out / "type.json").write_text(json.dumps({
-        "key": key, "name": args.name,
+        "key": key, "name": args.name, "maturity": maturity,
         "description": f"Custom model: warns of a failure within {horizon}.",
         "dataset": f"{args.source} -- {s['machine_id'].nunique()} machines, "
                    f"{n_events} failure events",

@@ -129,10 +129,12 @@ def _score_conveyor(payload: dict) -> dict:
     proba = model.predict_proba(X)[0]
     classes = meta["classes"]
     prob_fault = float(1 - proba[classes.index("normal")])
-    top = classes[int(proba.argmax())]
+    alert = prob_fault >= meta.get("threshold", 0.5)  # validated false-alarm-capped threshold
+    p = proba.copy()
+    p[classes.index("normal")] = 0
     return {"trained": True, "probability": round(prob_fault, 4),
-            "risk_level": risk_level(prob_fault), "alert": prob_fault >= 0.5,
-            "diagnosis": None if top == "normal" else top.replace("_", " "),
+            "risk_level": risk_level(prob_fault), "alert": alert,
+            "diagnosis": classes[int(p.argmax())].replace("_", " ") if alert else None,
             "note": _defaulted_note(payload, feats)}
 
 

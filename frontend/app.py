@@ -92,9 +92,10 @@ with tab_machines:
         m_name = st.text_input("Machine name / ID", placeholder="e.g. Mill-3, Pump-B, Turbine-North")
         type_key = st.selectbox("Machine type", list(types.keys()),
                                 format_func=lambda k: types[k]["name"] +
-                                ("" if types[k]["trained"] else "  (schema only, not yet trained)"))
+                                ("" if types[k]["trained"] else "  (schema only, not yet trained)") +
+                                ("  (experimental)" if types[k].get("maturity") == "experimental" else ""))
         st.caption(types[type_key]["description"] + " — trained on: " + types[type_key]["dataset"])
-        if not types[type_key]["trained"]:
+        if not types[type_key]["trained"] or types[type_key].get("maturity") == "experimental":
             st.warning(types[type_key]["note"])
         if st.form_submit_button("Add machine") and m_name:
             if api("POST", "/machines", json={"name": m_name, "machine_type": type_key}):
