@@ -1,0 +1,71 @@
+name: Train, test & publish model
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "train.py"
+      - "predict.py"
+      - "app.py"
+      - "tests/**"
+      - "requirements*.txt"
+      - "data/**"
+      - "notebooks/**"
+      - ".github/workflows/train.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: train
+  cancel-in-progress: true
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Train model (steps 2-7)
+        run: python train.py | tee reports-train.log
+
+      - name: Score sample machines (step 8)
+        run: python predict.py
+
+      - name: Run tests (incl. headless Streamlit app)
+        run: python -m pytest -v
+
+      - name: Execute notebook
+        run: jupyter nbconvert --to notebook --execute --inplace notebooks/01_eda_modeling.ipynb
+
+      - name: Job summary
+        run: cat reports/results.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            reports/
+            reports-train.log
+
+      - name: Commit trained model and reports
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add predictive_maintenance_model.pkl feature_names.pkl model_meta.json reports/ notebooks/
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update trained model and reports [skip ci]"
+            git push
+          fi

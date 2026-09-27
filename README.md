@@ -1,15 +1,18 @@
-# Predictive Maintenance
+# 🔧 Predictive Maintenance
 
-Predicts machine failure from sensor readings (type, air/process temperature, rotational speed, torque, tool wear) using the [AI4I 2020 dataset](https://archive.ics.uci.edu/dataset/601/ai4i+2020+predictive+maintenance+dataset) (10,000 machines, about 3.4% of them failed). The project compares Logistic Regression, Random Forest and XGBoost, and serves the XGBoost model in a Streamlit app.
+Predicts industrial machine failure from sensor readings using the [AI4I 2020 dataset](https://archive.ics.uci.edu/dataset/601/ai4i+2020+predictive+maintenance+dataset) (10,000 machines, about 3.4% of them failed). The project compares Logistic Regression, Random Forest and XGBoost, adds a tuned class-weighted XGBoost with physics-based features, and serves it in a Streamlit app.
+
+**📊 Latest results: [reports/results.md](reports/results.md)** (regenerated automatically on every push by GitHub Actions)
 
 ## Quick start
 
 ```bash
 python -m venv maintenance_env
 maintenance_env\Scripts\activate        # macOS/Linux: source maintenance_env/bin/activate
-pip install -r requirements.txt
-python train.py        # EDA, training, evaluation -> model .pkl + reports/
-python predict.py      # score 5 held-out machines
+pip install -r requirements-dev.txt
+python train.py        # EDA, training, tuning, evaluation -> model + reports/
+python predict.py      # score sample held-out machines
+python -m pytest       # unit tests + headless app test
 streamlit run app.py   # http://localhost:8501
 ```
 
@@ -17,19 +20,29 @@ streamlit run app.py   # http://localhost:8501
 
 | File | Guide step | Purpose |
 |---|---|---|
-| `train.py` | 2–7 | Load, EDA, preprocess, compare models, evaluate, save |
-| `predict.py` | 8 | `predict_failure_risk()` → probability + Low/Medium/High |
-| `app.py` | 9 | Streamlit app (single machine + CSV batch scoring) |
-| `notebooks/01_eda_modeling.ipynb` | 2–8 | The same analysis as a notebook |
-| `reports/` | — | Plots, `metrics.json`, and the held-out test set |
+| `train.py` | 2–7 | Load, EDA, preprocess, compare models, tune, choose threshold, evaluate, save |
+| `predict.py` | 8 | `add_features()` and `predict_failure_risk()` → probability, Low/Medium/High, alert flag |
+| `app.py` | 9 | Streamlit app: single machine, batch CSV scoring, model performance tab |
+| `notebooks/01_eda_modeling.ipynb` | 2–8 | The same pipeline as a narrated notebook |
+| `tests/` | — | pytest: feature math, risk bands, recall regression check, headless app test |
+| `.github/workflows/train.yml` | — | CI: retrain → test → execute notebook → commit model and reports |
+| `model_meta.json` | — | Alert threshold, hyperparameters, and feature list for the saved model |
 
-## Methodology notes
+## Methodology
 
-- **Leakage removed:** the `TWF/HDF/PWF/OSF/RNF` columns record *which* failure mode happened, so they give away the target. Keeping them makes any model look perfect.
-- **Honest test set:** the data is split 80/20 first. Only the training data is undersampled, so test metrics reflect the real ~3.4% failure rate.
-- **Thresholds:** `reports/metrics.json` lists precision and recall at thresholds 0.3, 0.5 and 0.7. Lower the threshold to catch more failures; raise it to get fewer false alarms.
-- The dataset is a snapshot with no timestamps. The model estimates *current* failure risk from the readings, not "hours in advance."
+- **No target leakage:** the `TWF/HDF/PWF/OSF/RNF` columns record *which* failure mode happened, so they give away the target and are dropped.
+- **Honest test set:** the data is split 80/20 first. The test set is never resampled, so it keeps the real ~3.4% failure rate.
+- **Engineered features:** each maps to one of the dataset's failure mechanisms.
+  - Power = torque × speed (power failure)
+  - Process − air temperature gap (heat-dissipation failure)
+  - Wear × torque (overstrain failure)
+- **Imbalance:** the guide's baselines use undersampling. The final model uses every training row with `scale_pos_weight` and is tuned for average precision (PR AUC). PR AUC is the metric that matters when failures are rare.
+- **Alert threshold:** chosen by 5-fold cross-validation on the training data to reach recall ≥ 0.85, then checked on the untouched test set.
+- **Explainability:** permutation importance on the test set shows which readings drive predictions.
+- **Limitation:** the dataset is a snapshot with no timestamps. The model estimates *current* failure risk from the readings; it cannot forecast "hours in advance."
 
-## Deploy (Streamlit Community Cloud)
+## Deploy (Streamlit Community Cloud, free)
 
-Push this repo to GitHub, including the `.pkl` files. Then go to share.streamlit.io → **New app** → pick the repo → main file `app.py` → **Deploy**.
+1. Go to [share.streamlit.io](https://share.streamlit.io) and sign in with GitHub.
+2. Click **Create app**, pick this repo and branch `main`, and set the main file to `app.py`.
+3. Click **Deploy**. The trained model files are committed by CI, so the app works immediately.
