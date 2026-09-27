@@ -24,8 +24,12 @@ permissions:
   contents: write
 
 concurrency:
+  # Runs now take much longer (2 real-data model trainings + a live Docker
+  # build/smoke-test), so overlapping runs QUEUE instead of killing each
+  # other -- cancel-in-progress previously killed an in-progress run
+  # mid-way with an unhelpful "operation was canceled" error.
   group: train
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   train:
