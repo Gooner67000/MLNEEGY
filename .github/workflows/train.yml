@@ -17,6 +17,8 @@ on:
       - "requirements*.txt"
       - "data/**"
       - "notebooks/**"
+      - "Dockerfile.*"
+      - "docker-compose.yml"
       - ".github/workflows/train.yml"
   workflow_dispatch:
 
@@ -24,16 +26,16 @@ permissions:
   contents: write
 
 concurrency:
-  # Runs now take much longer (2 real-data model trainings + a live Docker
-  # build/smoke-test), so overlapping runs QUEUE instead of killing each
-  # other -- cancel-in-progress previously killed an in-progress run
-  # mid-way with an unhelpful "operation was canceled" error.
+  # Runs now take a while, so a second push queues behind the first instead
+  # of killing it mid-way (cancel-in-progress previously caused an
+  # unrelated "operation was canceled" failure).
   group: train
   cancel-in-progress: false
 
 jobs:
   train:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -60,7 +62,7 @@ jobs:
 
       - name: Train wind turbine / generator model (real SCADA data)
         run: python train_wind_turbine.py | tee reports-wind-turbine.log
-        timeout-minutes: 20
+        timeout-minutes: 15
 
       - name: Run tests (incl. leakage guards, backend API, headless Streamlit app)
         run: python -m pytest -v
@@ -84,6 +86,23 @@ jobs:
             reports-bearing.log
             reports-wind-turbine.log
 
+      # Handed to the docker-smoke-test job below, which runs on its OWN
+      # fresh runner -- keeps a Docker build from ever sharing disk/memory
+      # with this training job.
+      - name: Package trained models for the Docker smoke test
+        run: |
+          mkdir -p _artifact_payload
+          cp predictive_maintenance_model.pkl feature_names.pkl model_meta.json \
+             backtest_model.pkl turbine_meta.pkl \
+             bearing_model.pkl bearing_meta.pkl \
+             wind_turbine_model.pkl wind_turbine_meta.pkl \
+             _artifact_payload/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trained-models
+          path: _artifact_payload/
+
       - name: Commit trained models, reports, and real-data caches
         run: |
           git config user.name "github-actions[bot]"
@@ -102,6 +121,21 @@ jobs:
             git commit -m "Update trained models and reports [skip ci]"
             git push
           fi
+
+  docker-smoke-test:
+    needs: train
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Disk space before build (debugging aid if this job ever fails again)
+        run: df -h
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: trained-models
+          path: .
 
       - name: Smoke-test the actual downloadable Docker stack
         run: |
@@ -132,5 +166,15 @@ jobs:
           print('Docker stack smoke test passed:', r)
           "
           curl -sf http://localhost:8501 > /dev/null && echo "Frontend responding"
-          docker compose logs --tail=50
-          docker compose down -v
+
+      - name: Disk space after build
+        if: always()
+        run: df -h
+
+      - name: Container logs
+        if: always()
+        run: docker compose logs --tail=100
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

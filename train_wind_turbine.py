@@ -50,10 +50,10 @@ SOURCE_URL = ("https://huggingface.co/datasets/kevykibbz/"
               "wind-turbine-scada-data-for-early-fault-detection.csv")
 SUBSAMPLE_CSV = ROOT / "data" / "wind_turbine_subsample.csv"
 
-PER_ASSET_CAP = 2000     # rows kept per turbine
-N_ASSETS_TARGET = 20     # stop once this many turbines are fully sampled
-MAX_CHUNKS = 60          # hard safety limit on how much of the 12 GB file we scan
-CHUNK_SIZE = 20_000
+PER_ASSET_CAP = 1500     # rows kept per turbine
+N_ASSETS_TARGET = 15     # stop once this many turbines are fully sampled
+MAX_CHUNKS = 40          # hard safety limit on how much of the 12 GB file we scan
+CHUNK_SIZE = 15_000
 ROLL_WINDOW = 6
 SEED = 42
 
