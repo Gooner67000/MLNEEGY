@@ -1,14 +1,11 @@
-Loaded 9487 segments from 10 recordings.
-label
-Inner_Race    2848
-Outer_Race    2848
-Ball_Fault    2847
-Normal         944
-Name: count, dtype: int64
+1200 windows from 60 recordings of 20 physical bearings
+  fold 1: held out bearings [np.int64(5), np.int64(10), np.int64(15), np.int64(20)]
+  fold 2: held out bearings [np.int64(4), np.int64(9), np.int64(14), np.int64(19)]
+  fold 3: held out bearings [np.int64(3), np.int64(8), np.int64(13), np.int64(18)]
+  fold 4: held out bearings [np.int64(2), np.int64(7), np.int64(12), np.int64(17)]
+  fold 5: held out bearings [np.int64(1), np.int64(6), np.int64(11), np.int64(16)]
 
-Train: 6639 segments from 7 recordings
-Test:  2848 segments from 3 recordings (never trained on)
+Healthy-vs-damaged ROC AUC 0.941 | developing faults caught 84% | faulty caught 92% | false alarms on healthy 8%
+Recordings: 36/60 states correct; fault type correct on 56% of damaged windows
 
-Held-out recordings -- accuracy 0.3883  balanced accuracy 0.3882  macro F1 0.3124  any-fault recall 1.0000
-
-Saved bearing_model.pkl, bearing_meta.pkl; see reports/bearing_results.md
+Saved bearing_model.pkl, bearing_type_model.pkl; see reports/bearing_results.md

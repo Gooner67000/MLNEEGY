@@ -1,0 +1,17 @@
+Downloading https://fdddata.lbl.gov/data/Simulated_LBNL_FDD_Data_Sets_RTU/LBNL_FDD_Data_Sets_RTU.zip ...
+Cached 89280 rows from 52 real test files
+89280 minutes of real RTU data, 62 unit-days, fault-minute share 0.77
+  held out Fall_2020: 28800 minutes scored by a model that never saw it
+  held out Spring_2021: 20160 minutes scored by a model that never saw it
+  held out Summer_2021: 20160 minutes scored by a model that never saw it
+  held out Winter_2022: 20160 minutes scored by a model that never saw it
+
+Minute-level ROC AUC (occupied hours) 0.595, PR AUC 0.846; all hours 0.547
+Day-level: flagged 38/48 fault days (79%); false alarms on 12/14 fault-free days
+                       mean  count
+fault                             
+economizer_setpoint  0.6250     16
+oa_damper_stuck      0.9375     16
+sa_temp_sensor_bias  0.8125     16
+
+Saved hvac_model.pkl, hvac_diag_model.pkl; see reports/hvac_results.md
