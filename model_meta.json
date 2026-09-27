@@ -1,0 +1,26 @@
+{
+  "model": "XGBoost tuned (class-weighted)",
+  "threshold": 0.27905750274658203,
+  "target_recall": 0.85,
+  "scale_pos_weight": 28.52029520295203,
+  "best_params": {
+    "subsample": 1.0,
+    "reg_lambda": 3,
+    "n_estimators": 500,
+    "min_child_weight": 1,
+    "max_depth": 6,
+    "learning_rate": 0.03,
+    "colsample_bytree": 0.85
+  },
+  "features": [
+    "Type",
+    "Air temperature K",
+    "Process temperature K",
+    "Rotational speed rpm",
+    "Torque Nm",
+    "Tool wear min",
+    "Power W",
+    "Temp diff K",
+    "Strain"
+  ]
+}

@@ -1,0 +1,105 @@
+{
+  "comparison": {
+    "Logistic Regression": {
+      "trained_on": "undersampled",
+      "cv_auc": 0.9007731637361267,
+      "roc_auc": 0.9231518694434295,
+      "pr_auc": 0.42541179226039666,
+      "threshold": 0.5,
+      "accuracy": 0.841,
+      "precision": 0.15846994535519127,
+      "recall": 0.8529411764705882,
+      "f1": 0.2672811059907834,
+      "confusion_matrix": {
+        "tn": 1624,
+        "fp": 308,
+        "fn": 10,
+        "tp": 58
+      }
+    },
+    "Random Forest": {
+      "trained_on": "undersampled",
+      "cv_auc": 0.9695067963586481,
+      "roc_auc": 0.9777623005724029,
+      "pr_auc": 0.6799822477170935,
+      "threshold": 0.5,
+      "accuracy": 0.908,
+      "precision": 0.26422764227642276,
+      "recall": 0.9558823529411765,
+      "f1": 0.4140127388535032,
+      "confusion_matrix": {
+        "tn": 1751,
+        "fp": 181,
+        "fn": 3,
+        "tp": 65
+      }
+    },
+    "XGBoost": {
+      "trained_on": "undersampled",
+      "cv_auc": 0.9645504426985909,
+      "roc_auc": 0.9763274875167458,
+      "pr_auc": 0.7039471467095519,
+      "threshold": 0.5,
+      "accuracy": 0.92,
+      "precision": 0.2909090909090909,
+      "recall": 0.9411764705882353,
+      "f1": 0.4444444444444444,
+      "confusion_matrix": {
+        "tn": 1776,
+        "fp": 156,
+        "fn": 4,
+        "tp": 64
+      }
+    },
+    "XGBoost tuned (class-weighted)": {
+      "trained_on": "all rows",
+      "cv_auc": 0.9781563937308672,
+      "roc_auc": 0.985537693338205,
+      "pr_auc": 0.8876725495391644,
+      "threshold": 0.5,
+      "accuracy": 0.99,
+      "precision": 0.8636363636363636,
+      "recall": 0.8382352941176471,
+      "f1": 0.8507462686567164,
+      "confusion_matrix": {
+        "tn": 1923,
+        "fp": 9,
+        "fn": 11,
+        "tp": 57
+      }
+    }
+  },
+  "final": {
+    "roc_auc": 0.985537693338205,
+    "pr_auc": 0.8876725495391644,
+    "threshold": 0.27905750274658203,
+    "accuracy": 0.9805,
+    "precision": 0.6666666666666666,
+    "recall": 0.8529411764705882,
+    "f1": 0.7483870967741936,
+    "confusion_matrix": {
+      "tn": 1903,
+      "fp": 29,
+      "fn": 10,
+      "tp": 58
+    }
+  },
+  "thresholds": {
+    "0.279": {
+      "precision": 0.6666666666666666,
+      "recall": 0.8529411764705882
+    },
+    "0.3": {
+      "precision": 0.6744186046511628,
+      "recall": 0.8529411764705882
+    },
+    "0.5": {
+      "precision": 0.8636363636363636,
+      "recall": 0.8382352941176471
+    },
+    "0.7": {
+      "precision": 0.9322033898305084,
+      "recall": 0.8088235294117647
+    }
+  }
+}
