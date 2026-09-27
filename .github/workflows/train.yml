@@ -7,6 +7,7 @@ on:
       - "train.py"
       - "predict.py"
       - "app.py"
+      - "backtest.py"
       - "tests/**"
       - "requirements*.txt"
       - "data/**"
@@ -42,14 +43,17 @@ jobs:
       - name: Score sample machines (step 8)
         run: python predict.py
 
-      - name: Run tests (incl. headless Streamlit app)
+      - name: Walk-forward backtest on real run-to-failure data (no lookahead)
+        run: python backtest.py | tee reports-backtest.log
+
+      - name: Run tests (incl. leakage guards + headless Streamlit app)
         run: python -m pytest -v
 
       - name: Execute notebook
         run: jupyter nbconvert --to notebook --execute --inplace notebooks/01_eda_modeling.ipynb
 
       - name: Job summary
-        run: cat reports/results.md >> "$GITHUB_STEP_SUMMARY"
+        run: cat reports/results.md reports/backtest_results.md >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -57,12 +61,13 @@ jobs:
           path: |
             reports/
             reports-train.log
+            reports-backtest.log
 
       - name: Commit trained model and reports
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add predictive_maintenance_model.pkl feature_names.pkl model_meta.json reports/ notebooks/
+          git add predictive_maintenance_model.pkl feature_names.pkl model_meta.json backtest_model.pkl reports/ notebooks/ data/cmapss_train_FD001.csv
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else

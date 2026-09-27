@@ -2,7 +2,7 @@
 
 Predicts industrial machine failure from sensor readings using the [AI4I 2020 dataset](https://archive.ics.uci.edu/dataset/601/ai4i+2020+predictive+maintenance+dataset) (10,000 machines, about 3.4% of them failed). The project compares Logistic Regression, Random Forest and XGBoost, adds a tuned class-weighted XGBoost with physics-based features, and serves it in a Streamlit app.
 
-**📊 Latest results: [reports/results.md](reports/results.md)** (regenerated automatically on every push by GitHub Actions)
+**📊 Latest results: [reports/results.md](reports/results.md)** — **🔁 Backtest on real run-to-failure data: [reports/backtest_results.md](reports/backtest_results.md)** (both regenerated automatically on every push by GitHub Actions)
 
 ## Quick start
 
@@ -40,6 +40,31 @@ streamlit run app.py   # http://localhost:8501
 - **Alert threshold:** chosen by 5-fold cross-validation on the training data to reach recall ≥ 0.85, then checked on the untouched test set.
 - **Explainability:** permutation importance on the test set shows which readings drive predictions.
 - **Limitation:** the dataset is a snapshot with no timestamps. The model estimates *current* failure risk from the readings; it cannot forecast "hours in advance."
+
+## Does it actually predict failure? (backtest)
+
+`train.py`'s AI4I2020 model is evaluated the correct way for its data: AI4I2020 is a
+**one-time snapshot** of 10,000 machines (no dates), so the honest test is an 80/20
+holdout split where the model never trains on the 2,000 test machines — that's what
+`reports/results.md` reports. It is **not** a walk-forward backtest, because there is
+no timeline in this dataset to walk forward through.
+
+`backtest.py` is a second, independent check: it runs a genuine no-lookahead
+walk-forward backtest on **real** run-to-failure data (NASA C-MAPSS turbofan engine
+degradation simulations — the standard benchmark in predictive-maintenance research,
+100 engines run from healthy to actual failure). It proves the methodology, with two
+guards enforced in code and checked by `tests/test_backtest.py`:
+
+1. **Engine holdout** — test engines are 100% unseen during training.
+2. **Cycle causality** — every feature at cycle *t* uses only that engine's own data
+   up to cycle *t*. A cycle-by-cycle replay literally truncates each test engine's
+   data to "now" before asking the model for a prediction, so it's structurally
+   impossible for it to see the future.
+
+Run `python backtest.py` (or read [reports/backtest_results.md](reports/backtest_results.md)
+for the latest CI run) for the numbers: ROC/PR AUC on held-out engines, and — the
+metric that actually answers "does this predict failure in advance" — how many
+cycles before each held-out engine's real failure the model raised its first alert.
 
 ## Deploy (Streamlit Community Cloud, free)
 
