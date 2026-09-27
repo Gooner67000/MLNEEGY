@@ -52,7 +52,17 @@ def hvac_features(df: pd.DataFrame) -> pd.DataFrame:
     out["econ_dmpr"] = out["econ_should_run"] * out["dmpr_frac"]
     out["hour_sin"] = np.sin(2 * np.pi * out["hour"] / 24)
     out["hour_cos"] = np.cos(2 * np.pi * out["hour"] / 24)
-    for c in ["mix_resid", "oa_frac_gap", "sa_dev", "comp_total", "RTU_SA_FAN_WATT", "dmpr_frac"]:
+    # Control-sequence checks: what the damper SHOULD do given the conditions,
+    # vs. what it's doing. (A damper fault imposed through the controller shows
+    # up here, not as a command-vs-measurement mismatch.)
+    running = (out["RTU_SA_FAN_WATT"] > 200).astype(float)
+    out["dmpr_below_min"] = ((out["dmpr_frac"] < 0.095) & (running > 0)).astype(float)
+    out["dmpr_open_when_hot"] = out["dmpr_frac"] * (oa > 55).astype(float) * running
+    out["dmpr_shut_when_cool"] = (1 - out["dmpr_frac"]) * out["econ_should_run"]
+    cooling = (out["comp_total"] > 100).astype(float)
+    out["sa_dev_cooling"] = out["sa_dev"] * cooling  # SA is only held at setpoint while cooling
+    for c in ["mix_resid", "oa_frac_gap", "sa_dev", "comp_total", "RTU_SA_FAN_WATT", "dmpr_frac",
+              "dmpr_open_when_hot", "dmpr_shut_when_cool", "sa_dev_cooling"]:
         out[f"{c}_roll"] = out[c].rolling(HVAC_ROLL, min_periods=1).mean()
     return out
 
@@ -64,6 +74,8 @@ HVAC_FEATURES = [
     "hour_sin", "hour_cos",
     "mix_resid_roll", "oa_frac_gap_roll", "sa_dev_roll", "comp_total_roll",
     "RTU_SA_FAN_WATT_roll", "dmpr_frac_roll",
+    "dmpr_below_min", "dmpr_open_when_hot", "dmpr_shut_when_cool", "sa_dev_cooling",
+    "dmpr_open_when_hot_roll", "dmpr_shut_when_cool_roll", "sa_dev_cooling_roll",
 ]
 
 # ------------------------------------------------------------ robot arm (UR3)
@@ -99,6 +111,28 @@ def robot_features(df: pd.DataFrame) -> pd.DataFrame:
     out["tool_cur_roll"] = out["Tool_current"].rolling(ROBOT_ROLL, min_periods=1).mean()
     out["temp_rate"] = (out["temp_max"] - out["temp_max"].shift(ROBOT_ROLL)).fillna(0)
     return out
+
+
+def generic_features(df: pd.DataFrame, sensors: list[str], roll: int, long_roll: int) -> pd.DataFrame:
+    """For a customer's own machine type (train_custom.py): per sensor, the
+    reading itself, its short rolling mean/std, its change since the last
+    reading, and how far it sits from this machine's own longer-run baseline.
+    All backward-looking."""
+    out = df.copy()
+    for c in sensors:
+        x = pd.to_numeric(out.get(c, np.nan), errors="coerce")
+        out[c] = x
+        r = x.rolling(roll, min_periods=1)
+        out[f"{c}__mean"] = r.mean()
+        out[f"{c}__std"] = r.std().fillna(0)
+        out[f"{c}__diff"] = x.diff().fillna(0)
+        base = x.rolling(long_roll, min_periods=1)
+        out[f"{c}__z"] = ((x - base.mean()) / base.std().replace(0, np.nan)).fillna(0)
+    return out
+
+
+def generic_feature_names(sensors: list[str]) -> list[str]:
+    return [f for c in sensors for f in (c, f"{c}__mean", f"{c}__std", f"{c}__diff", f"{c}__z")]
 
 
 ROBOT_FEATURES = ROBOT_RAW + [

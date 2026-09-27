@@ -66,7 +66,9 @@ def load_data() -> pd.DataFrame:
     df = pd.read_excel(io.BytesIO(zf.read(xlsx)))
     df = df.loc[:, [c for c in df.columns if isinstance(c, str) and not c.startswith("Unnamed")]]
     df = df.rename(columns={"Temperature_T0": "Temperature_J0", "cycle ": "cycle"})
-    df["Timestamp"] = pd.to_datetime(df["Timestamp"], utc=True)
+    # Some source timestamps are wrapped in an extra pair of quote marks.
+    df["Timestamp"] = pd.to_datetime(df["Timestamp"].astype(str).str.strip('"'),
+                                     utc=True, format="ISO8601")
     df.to_csv(CACHE, index=False, compression="gzip")
     return df
 

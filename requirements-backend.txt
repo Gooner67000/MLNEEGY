@@ -5,3 +5,4 @@ pydantic[email]>=2.6
 bcrypt>=4.1
 pyjwt>=2.8
 requests>=2.31
+psycopg2-binary>=2.9

@@ -1,0 +1,4 @@
+timestamp,machine_id,motor_current_a,bearing_temp_c,vibration_rms_g,speed_rpm
+2026-03-04 14:00:00,PRESS-01,12.4,41.2,0.08,1480
+2026-03-04 14:01:00,PRESS-01,12.6,41.3,0.08,1479
+2026-03-04 14:00:00,PRESS-02,11.9,39.8,0.07,1481

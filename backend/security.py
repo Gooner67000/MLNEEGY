@@ -10,6 +10,12 @@ import bcrypt
 import jwt
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-insecure-secret-change-me")
+# On a public deployment a guessable key would let anyone forge login tokens,
+# so refuse to start rather than run insecurely.
+if os.environ.get("PM_ENV") == "production" and (
+        len(SECRET_KEY) < 32 or "change-me" in SECRET_KEY or "insecure" in SECRET_KEY):
+    raise RuntimeError("PM_ENV=production requires SECRET_KEY to be a random string of "
+                       "32+ characters (e.g. `python -c \"import secrets; print(secrets.token_urlsafe(48))\"`).")
 ALGORITHM = "HS256"
 TOKEN_TTL_HOURS = 24 * 7
 

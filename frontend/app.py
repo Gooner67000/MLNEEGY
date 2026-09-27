@@ -9,7 +9,9 @@ network, and (with DATABASE_URL pointed at a real database) as a hosted
 multi-tenant service later.
 
 Run:  streamlit run frontend/app.py
-Env:  API_BASE (default http://localhost:8000)
+Env:  API_BASE (default http://localhost:8000) -- where this app reaches the backend
+      PUBLIC_API_BASE -- the address customers should use (defaults to API_BASE;
+      differs when hosted, where API_BASE is a private internal address)
 """
 import json
 import os
@@ -18,7 +20,10 @@ import pandas as pd
 import requests
 import streamlit as st
 
-API_BASE = os.environ.get("API_BASE", "http://localhost:8000")
+API_BASE = os.environ.get("API_BASE", "http://localhost:8000").rstrip("/")
+if "://" not in API_BASE:  # e.g. a bare host:port from a hosting provider
+    API_BASE = "http://" + API_BASE
+PUBLIC_API_BASE = (os.environ.get("PUBLIC_API_BASE") or API_BASE).rstrip("/")
 st.set_page_config(page_title="Predictive Maintenance Platform", page_icon="🛠️", layout="wide")
 
 
@@ -208,10 +213,10 @@ with tab_api:
         example_payload = {s["key"]: s["default"] for s in example_type["sensors"]}
         example_body = json.dumps({"payload": example_payload, "source": "api"})
         st.code(
-            f"""curl -X POST {API_BASE}/machines/{example_machine['id']}/readings \\
+            f"""curl -X POST {PUBLIC_API_BASE}/machines/{example_machine['id']}/readings \\
   -H "Authorization: Bearer <your token>" \\
   -H "Content-Type: application/json" \\
   -d '{example_body}'""",
             language="bash",
         )
-    st.write(f"Full interactive API docs: [{API_BASE}/docs]({API_BASE}/docs)")
+    st.write(f"Full interactive API docs: [{PUBLIC_API_BASE}/docs]({PUBLIC_API_BASE}/docs)")

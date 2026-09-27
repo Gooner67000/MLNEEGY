@@ -1,0 +1,42 @@
+# One-click hosted deployment on Render (render.com) -- see DEPLOY.md.
+# Creates: the API (backend), the web app (frontend), and a Postgres database.
+# All three use Render's free plan; free services sleep after ~15 min idle
+# and free databases expire after a set period -- see DEPLOY.md before
+# putting real customers on it.
+services:
+  - type: web
+    name: pm-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile.backend
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: PM_ENV
+        value: production          # refuses to start without a strong SECRET_KEY
+      - key: SECRET_KEY
+        generateValue: true        # Render generates a random secret
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pm-db
+          property: connectionString
+
+  - type: web
+    name: pm-frontend
+    runtime: docker
+    dockerfilePath: ./Dockerfile.frontend
+    dockerContext: .
+    plan: free
+    envVars:
+      # Free Render services can't talk over the private network, so the web
+      # app calls the API's public URL. Render asks for this value when you
+      # create the blueprint; you only learn the URL after pm-backend exists,
+      # so enter a placeholder, then paste the real URL -- see DEPLOY.md step 4.
+      - key: API_BASE
+        sync: false
+      - key: PUBLIC_API_BASE
+        sync: false
+
+databases:
+  - name: pm-db
+    plan: free

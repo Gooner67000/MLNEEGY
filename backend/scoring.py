@@ -105,7 +105,11 @@ def _score_hvac(payload: dict, history: list[dict]) -> dict:
     payload.setdefault("hour", float(datetime.now().hour))
     feats = hvac_features(_history_frame(payload, history, meta["raw"], meta["medians"]))
     X = feats.iloc[[-1]][meta["features"]]
-    prob = float(model.predict_proba(X)[0, 1])
+    # Validated as an average over recent running minutes, so alert on the same
+    # smoothed score (a single minute on its own is too noisy to act on).
+    recent = feats.iloc[-meta.get("smooth_minutes", 15):]
+    probs = model.predict_proba(recent[meta["features"]])[:, 1]
+    prob = float(probs.mean())
     alert = prob >= meta["threshold"]
     diagnosis = None
     if alert:
@@ -130,6 +134,21 @@ def _score_conveyor(payload: dict) -> dict:
             "risk_level": risk_level(prob_fault), "alert": prob_fault >= 0.5,
             "diagnosis": None if top == "normal" else top.replace("_", " "),
             "note": _defaulted_note(payload, feats)}
+
+
+def _score_custom(machine_type: str, payload: dict, history: list[dict]) -> dict:
+    from pm_features import generic_features
+    folder = f"custom_models/{machine_type}"
+    model, meta = _load(f"{folder}/model.pkl", f"{folder}/meta.pkl")
+    frame = _history_frame(payload, history, meta["raw"], meta["medians"])
+    feats = generic_features(frame, meta["raw"], meta["roll"], meta["long_roll"])
+    X = feats.iloc[[-1]][meta["features"]]
+    prob = float(model.predict_proba(X)[0, 1])
+    return {"trained": True, "probability": round(prob, 4), "risk_level": risk_level(prob),
+            "alert": prob >= meta["threshold"],
+            "diagnosis": (f"failure likely within {meta['horizon']}"
+                          if prob >= meta["threshold"] else None),
+            "note": _defaulted_note(payload, meta["raw"])}
 
 
 def _score_robot(payload: dict, history: list[dict]) -> dict:
@@ -179,4 +198,6 @@ def score(machine_type: str, payload: dict, history: list[dict]) -> dict:
         return _score_robot(payload, history)
     if machine_type == "conveyor":
         return _score_conveyor(payload)
+    if machine_type.startswith("custom_"):
+        return _score_custom(machine_type, payload, history)
     raise ValueError(f"No scoring function wired up for trained type '{machine_type}'")

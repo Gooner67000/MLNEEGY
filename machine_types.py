@@ -190,6 +190,24 @@ MACHINE_TYPES: dict[str, MachineType] = {
 }
 
 
+CUSTOM_DIR = ROOT / "custom_models"
+
+
+def _load_custom_types() -> None:
+    """Machine types trained on a customer's own data by train_custom.py."""
+    import json
+    for spec_path in sorted(CUSTOM_DIR.glob("*/type.json")):
+        spec = json.loads(spec_path.read_text())
+        MACHINE_TYPES[spec["key"]] = MachineType(
+            key=spec["key"], name=spec["name"], description=spec["description"],
+            dataset=spec["dataset"], trained=True,
+            model_path=str(spec_path.parent.relative_to(ROOT) / "model.pkl"),
+            sensors=[SensorField(**s) for s in spec["sensors"]], note=spec.get("note", ""))
+
+
+_load_custom_types()
+
+
 def get(key: str) -> MachineType:
     if key not in MACHINE_TYPES:
         raise KeyError(f"Unknown machine type '{key}'. Known: {list(MACHINE_TYPES)}")

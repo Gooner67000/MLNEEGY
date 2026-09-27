@@ -1,0 +1,3 @@
+machine_id,timestamp,event_type
+PRESS-01,2026-02-11 09:30:00,bearing failure
+PRESS-02,2026-01-27 16:10:00,motor trip
