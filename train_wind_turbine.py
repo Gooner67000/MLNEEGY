@@ -1,12 +1,25 @@
 """Trains the model for machine_types['wind_turbine_generator'].
 
 Data: real SCADA telemetry from an operating wind farm (anonymized sensor
-names, real status/event codes) -- not synthetic. The source file is ~12 GB,
-far more than needed and impractical to fully re-download on every CI run, so
-this script streams it in chunks and keeps a bounded, real subsample: up to
-PER_ASSET_CAP rows for each of the first N_ASSETS_TARGET distinct turbines it
-encounters. That subsample is cached to data/ so later runs don't re-stream.
-This is subsampling real data, not synthesizing data.
+names, real status/event codes) -- not synthetic. The source file is ~12 GB
+and, importantly, laid out SEQUENTIALLY BY TURBINE (confirmed by probing it:
+a single contiguous slice anywhere in the file belongs to one turbine, not
+a mix), so this script issues N_ASSETS_TARGET small HTTP Range requests at
+points spread evenly across the whole file -- each one lands in a different
+turbine's block -- and keeps up to PER_ASSET_CAP consecutive rows from each.
+That subsample is cached to data/ so later runs don't re-fetch. This is
+subsampling real data at several real points in time, not synthesizing data.
+
+Two earlier approaches failed before this one:
+  1. pandas' own chunked CSV reader directly against the URL (chunksize=...)
+     stalled unpredictably in CI with no output and got killed by the
+     runner (exit 143).
+  2. A single large bounded prefix (one contiguous slice from the start of
+     the file) was fast and reliable, but -- because of the sequential
+     layout above -- only ever captured ONE turbine, useless for a
+     multi-turbine holdout.
+This version's small, spread-out, explicitly-timed-out requests are both
+fast/reliable AND turbine-diverse.
 
 Label: status_type_id == 0 means normal operation; any other code is a
 logged event/anomaly. y = 1 for "not normal right now".
@@ -18,7 +31,9 @@ Leakage guards, same shape as backtest.py:
 
 Run:  python train_wind_turbine.py
 """
+import io
 import json
+import time
 import warnings
 from pathlib import Path
 
@@ -29,6 +44,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import requests
 from sklearn.metrics import (
     average_precision_score,
     confusion_matrix,
@@ -50,41 +66,64 @@ SOURCE_URL = ("https://huggingface.co/datasets/kevykibbz/"
               "wind-turbine-scada-data-for-early-fault-detection.csv")
 SUBSAMPLE_CSV = ROOT / "data" / "wind_turbine_subsample.csv"
 
-PER_ASSET_CAP = 1500     # rows kept per turbine
-N_ASSETS_TARGET = 15     # stop once this many turbines are fully sampled
-MAX_CHUNKS = 40          # hard safety limit on how much of the 12 GB file we scan
-CHUNK_SIZE = 15_000
-ROLL_WINDOW = 6
-SEED = 42
+PER_ASSET_CAP = 1500          # rows kept per turbine
+N_ASSETS_TARGET = 15          # number of spread-out points sampled across the file
+OFFSET_CHUNK_BYTES = 10_000_000  # ~10MB per sample point -> comfortably > PER_ASSET_CAP rows
+REQUEST_TIMEOUT = (15, 60)    # (connect, read) seconds -- fail loud instead of hanging
+
+
+def fetch_range(start: int, length: int) -> bytes:
+    resp = requests.get(SOURCE_URL, headers={"Range": f"bytes={start}-{start + length - 1}"},
+                        timeout=REQUEST_TIMEOUT)
+    resp.raise_for_status()
+    return resp.content
 
 
 def build_subsample() -> pd.DataFrame:
-    """Streams the real source file and keeps a bounded, honest subsample."""
-    print(f"Streaming {SOURCE_URL} (this can take a few minutes)...")
-    kept: dict[object, list[pd.DataFrame]] = {}
-    finished_assets = set()
-    reader = pd.read_csv(SOURCE_URL, chunksize=CHUNK_SIZE, low_memory=False)
-    for i, chunk in enumerate(reader):
-        if i >= MAX_CHUNKS:
-            print(f"Hit MAX_CHUNKS={MAX_CHUNKS} safety limit, stopping stream.")
-            break
+    """N_ASSETS_TARGET small, explicitly-timed-out Range requests at points
+    spread evenly across the real ~12GB file -- fast and reliable (each
+    request is a few MB with its own timeout), and turbine-diverse (the
+    file's sequential-by-turbine layout means spread-out points land in
+    different turbines' blocks)."""
+    total_size = int(requests.head(SOURCE_URL, allow_redirects=True,
+                                   timeout=REQUEST_TIMEOUT).headers.get("Content-Length", 0))
+    if not total_size:  # HEAD didn't give a size (e.g. chunked encoding) -- ask via Range instead
+        resp = requests.get(SOURCE_URL, headers={"Range": "bytes=0-1"}, timeout=REQUEST_TIMEOUT)
+        total_size = int(resp.headers["Content-Range"].split("/")[-1])
+    print(f"Real source file is {total_size / 1e9:.1f}GB total.", flush=True)
+
+    # The real header turned out to be 957 columns wide (far more than an
+    # early truncated preview suggested) -- fetch generously so it's never
+    # cut mid-header, which would silently misalign every parsed row.
+    header = fetch_range(0, 200_000).decode("utf-8", errors="ignore").split("\n")[0]
+    columns = header.split(",")
+    print(f"Header has {len(columns)} columns.", flush=True)
+
+    start = time.time()
+    kept, seen_assets = [], set()
+    offsets = [int(total_size * i / N_ASSETS_TARGET) for i in range(N_ASSETS_TARGET)]
+    for i, off in enumerate(offsets):
+        print(f"  Sampling point {i + 1}/{len(offsets)} (~{off / 1e9:.2f}GB into the file, "
+              f"{time.time() - start:.0f}s elapsed)...", flush=True)
+        raw = fetch_range(off, OFFSET_CHUNK_BYTES)
+        text = raw.decode("utf-8", errors="ignore")
+        lines = text.split("\n")[1:-1]  # drop the partial first & last line (mid-file landing)
+        if not lines:
+            continue
+        chunk = pd.read_csv(io.StringIO("\n".join(lines)), names=columns, header=None,
+                            low_memory=False)
         for asset_id, group in chunk.groupby("asset_id"):
-            if asset_id in finished_assets:
+            if asset_id in seen_assets:
                 continue
-            have = sum(len(g) for g in kept.get(asset_id, []))
-            take = group.head(max(0, PER_ASSET_CAP - have))
-            if len(take):
-                kept.setdefault(asset_id, []).append(take)
-            if have + len(take) >= PER_ASSET_CAP:
-                finished_assets.add(asset_id)
-        if len(finished_assets) >= N_ASSETS_TARGET:
-            print(f"Collected {N_ASSETS_TARGET} fully-sampled turbines after {i + 1} chunks.")
-            break
-    frames = [g for groups in kept.values() for g in groups]
-    df = pd.concat(frames, ignore_index=True)
-    print(f"Subsample: {len(df)} rows across {df['asset_id'].nunique()} real turbines "
-          f"(up to {PER_ASSET_CAP} rows/turbine, streamed from the real 12 GB source).")
-    return df
+            seen_assets.add(asset_id)
+            kept.append(group.head(PER_ASSET_CAP))
+    if not kept:
+        raise RuntimeError("Sampled 0 rows from the real source -- check SOURCE_URL / Range support")
+
+    out = pd.concat(kept, ignore_index=True)
+    print(f"Subsample: {len(out)} rows across {out['asset_id'].nunique()} real turbines, "
+          f"fetched in {time.time() - start:.0f}s.", flush=True)
+    return out
 
 
 def load_data() -> pd.DataFrame:
