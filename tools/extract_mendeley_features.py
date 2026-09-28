@@ -87,6 +87,24 @@ def waveform_features(x: np.ndarray, fs: float, bands_hz, prefix: str = "") -> d
     return {prefix + k: v for k, v in feats.items()}
 
 
+def order_band_features(x: np.ndarray, fs: float, shaft_hz: float, orders, prefix: str = "") -> dict:
+    """Energy ratio in bands defined as MULTIPLES OF SHAFT SPEED ("orders")
+    instead of fixed Hz -- the standard way vibration analysts make a reading
+    comparable across machines running at different speeds, since bearing/gear
+    fault frequencies scale with shaft speed, not absolute Hz. A model trained
+    only on fixed-Hz bands (see waveform_features above) implicitly assumes
+    every machine runs at the training rig's speed; this doesn't."""
+    x = x.astype(np.float64) - x.mean()
+    spec = np.abs(np.fft.rfft(x * np.hanning(len(x)))) ** 2
+    freqs = np.fft.rfftfreq(len(x), d=1.0 / fs)
+    total = float(spec.sum()) or 1e-12
+    feats = {}
+    for i, (lo, hi) in enumerate(orders):
+        m = (freqs >= lo * shaft_hz) & (freqs < hi * shaft_hz)
+        feats[f"order{i}"] = float(spec[m].sum() / total)
+    return {prefix + k: v for k, v in feats.items()}
+
+
 def write_gz_csv(rows: list[dict], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     cols = list(rows[0].keys())
@@ -101,6 +119,9 @@ def write_gz_csv(rows: list[dict], path: Path) -> None:
 # --------------------------------------------------------------- bearing
 UORED_TYPES = {"H": "healthy", "I": "inner_race", "O": "outer_race", "B": "ball", "C": "cage"}
 UORED_STATES = {0: "healthy", 1: "developing", 2: "faulty"}
+
+
+ORDERS = [(0, 3), (3, 10), (10, 30), (30, 100), (100, 300)]  # multiples of shaft speed
 
 
 def extract_bearing(raw_dir: Path, manifest: Path) -> None:
@@ -121,6 +142,7 @@ def extract_bearing(raw_dir: Path, manifest: Path) -> None:
         data = np.loadtxt(path, delimiter=",", skiprows=1, encoding="utf-8-sig")
         acc, mic, tdiff = data[:, 0], data[:, 1], data[:, 4]
         rpm, load = float(data[0, 2]), float(data[0, 3])
+        shaft_hz = rpm / 60.0
         # Healthy recordings are named H_<bearing>_0; the fault type of that
         # bearing is fixed by its ID range (1-5 inner, 6-10 outer, 11-15 ball, 16-20 cage).
         bearing_type = ["inner_race", "outer_race", "ball", "cage"][(bearing - 1) // 5]
@@ -139,6 +161,7 @@ def extract_bearing(raw_dir: Path, manifest: Path) -> None:
             }
             row.update(waveform_features(acc[s], fs, bands))
             row.update(waveform_features(mic[s], fs, bands, prefix="mic_"))
+            row.update(order_band_features(acc[s], fs, shaft_hz, ORDERS))
             rows.append(row)
         files_prov.append({"file": path.name, "sha256": sha256_of(path),
                            "source_url": urls.get(path.name, "")})
@@ -154,6 +177,7 @@ def extract_bearing(raw_dir: Path, manifest: Path) -> None:
         "license": "CC BY 4.0",
         "raw_format": "CSV: Accelerometer, Acoustic, Speed, Load, Temperature Difference @ 42 kHz, 10 s",
         "window_seconds": 0.5,
+        "order_bands_multiples_of_shaft_speed": ORDERS,
         "n_raw_files": len(files_prov),
         "files": files_prov,
     }, indent=2))

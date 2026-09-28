@@ -78,7 +78,9 @@ MACHINE_TYPES: dict[str, MachineType] = {
 
     "rotating_equipment": MachineType(
         key="rotating_equipment", name="Motor / Pump / Fan / Compressor / Gearbox",
-        description="Any rotating machine whose dominant failure mode is bearing wear.",
+        description="Manufacturing's largest equipment category, and bearing wear is its "
+                    "single largest failure mode (30-51% of rotating-equipment failures, "
+                    "per EPRI/IEEE-IAS). Our flagship model.",
         dataset="University of Ottawa UORED-VAFCLS (doi:10.17632/y2px5tg92h.2): 20 real "
                 "bearings, each recorded healthy -> developing fault -> faulty",
         trained=True, model_path="bearing_model.pkl",
@@ -88,15 +90,24 @@ MACHINE_TYPES: dict[str, MachineType] = {
             SensorField("crest", "Crest factor (peak/RMS)", "", 1.0, 20.0, 4.6),
             SensorField("kurtosis", "Kurtosis (impulsiveness, 0 = smooth)", "", -1.0, 40.0, 0.2),
             SensorField("spec_cent", "Spectral centroid", "Hz", 500, 10000, 2900),
+            SensorField("rpm", "Nameplate / rated shaft speed", "RPM", 300, 3600, 1780),
         ],
         note="Trained on features of an accelerometer waveform (42 kHz), which usually come "
-             "from a vibration sensor + edge device rather than being typed in. The 5 fields "
+             "from a vibration sensor + edge device rather than being typed in. The fields "
              "above are the most useful for a quick manual check; a full CSV/API reading "
              "(rms, std, peak, p2p, crest, kurtosis, skewness, shape, impulse, spec_cent, "
-             "spec_bw, spec_ent, band0-4) scores more accurately. Reports health state "
-             "(healthy / developing fault / faulty) and, once damaged, the likely defect "
-             "(inner race, outer race, ball, cage). Absolute RMS/peak depend on the sensor, "
-             "so calibrate against a known-healthy reading from the same sensor first.",
+             "spec_bw, spec_ent, band0-4, order0-4) scores more accurately. order0-4 are "
+             "vibration energy at multiples of shaft speed (the standard order-tracking "
+             "approach) rather than fixed frequency bands, so results are comparable across "
+             "machines running at different speeds -- provide rpm even without order data, "
+             "since it's a genuine input. Reports health state (healthy / developing fault / "
+             "faulty) and the likely defect once damaged (inner race, outer race, ball, cage). "
+             "Reliability teams may recognize ISO 10816-3's Zone A-D vibration severity "
+             "scale; our score is a separate, model-based probability, not a calibrated "
+             "mm/s-velocity ISO measurement, so we don't relabel it with ISO zone letters. "
+             "Absolute RMS/peak depend on the sensor, so calibrate against a known-healthy "
+             "reading from the same sensor first. Validated at ~1700-1820 RPM; order-tracking "
+             "should help at other speeds but that isn't validated by this dataset.",
     ),
 
     "wind_turbine_generator": MachineType(

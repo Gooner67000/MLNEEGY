@@ -23,6 +23,19 @@ values in some files and rises through each test sequence, so it would let a
 model learn *when* a recording was made rather than *what state* the bearing
 is in.
 
+Order-tracking: this rig recorded at ~1700-1820 RPM (it varies by bearing --
+confirmed by checking the raw files, not assumed). A model that only reads
+fixed-Hz frequency bands implicitly assumes every customer's machine runs at
+that same speed; a motor at 900 or 3600 RPM would have its fault energy land
+in different Hz bins than what the model learned. ORDER_FEATURES express
+energy as multiples of shaft speed instead (order_band_features() in
+tools/extract_mendeley_features.py) -- the standard fix in real vibration
+analysis. This dataset only covers ~1700-1820 RPM, so cross-speed
+generalization to e.g. 900 or 3600 RPM is a methodological improvement, NOT a
+validated result -- there's no data here to test it against. Order features
+require the customer's shaft speed (rpm); when it isn't provided, the API
+falls back to this dataset's median.
+
 Run:  python train_bearing.py
 """
 import json
@@ -49,8 +62,11 @@ REPORTS.mkdir(exist_ok=True)
 FEATURES_CSV = ROOT / "data" / "bearing_uored_features.csv.gz"
 STATES = ["healthy", "developing", "faulty"]
 TYPES = ["inner_race", "outer_race", "ball", "cage"]
-FEATURES = ["rms", "std", "peak", "p2p", "crest", "kurtosis", "skewness", "shape", "impulse",
-            "spec_cent", "spec_bw", "spec_ent", "band0", "band1", "band2", "band3", "band4"]
+FIXED_BAND_FEATURES = ["rms", "std", "peak", "p2p", "crest", "kurtosis", "skewness", "shape",
+                       "impulse", "spec_cent", "spec_bw", "spec_ent",
+                       "band0", "band1", "band2", "band3", "band4"]
+ORDER_FEATURES = ["order0", "order1", "order2", "order3", "order4"]  # multiples of shaft speed
+FEATURES = FIXED_BAND_FEATURES + ORDER_FEATURES + ["rpm"]
 SEED = 42
 
 
@@ -159,6 +175,13 @@ is bearing wear.
 **Leakage guard -- leave-bearings-out:** each of 5 folds holds out 4 whole physical bearings
 (all three of their states). Accelerometer only; the temperature channel is excluded because
 it has corrupted values and drifts through each test sequence.
+
+**Order-tracking:** features now include vibration energy expressed as multiples of shaft
+speed (not just fixed Hz bands), the standard way to make a reading comparable across
+machines running at different speeds -- bearing fault frequencies scale with shaft speed,
+not absolute Hz. This rig ran at ~1700-1820 RPM; generalizing to a real customer motor at,
+say, 900 or 3600 RPM is a methodological improvement, not a validated result -- there's no
+data here outside that range to test it against.
 
 | Metric (bearings never seen in training) | Value |
 |---|---|

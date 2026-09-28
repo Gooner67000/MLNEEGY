@@ -5,6 +5,28 @@
   "license": "CC BY 4.0",
   "raw_format": "CSV: Accelerometer, Acoustic, Speed, Load, Temperature Difference @ 42 kHz, 10 s",
   "window_seconds": 0.5,
+  "order_bands_multiples_of_shaft_speed": [
+    [
+      0,
+      3
+    ],
+    [
+      3,
+      10
+    ],
+    [
+      10,
+      30
+    ],
+    [
+      30,
+      100
+    ],
+    [
+      100,
+      300
+    ]
+  ],
   "n_raw_files": 60,
   "files": [
     {
