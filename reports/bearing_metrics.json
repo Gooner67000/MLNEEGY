@@ -4,13 +4,13 @@
   "n_windows": 1200,
   "n_recordings": 60,
   "n_bearings": 20,
-  "healthy_vs_damaged_roc_auc": 0.9409687500000001,
-  "developing_fault_windows_flagged": 0.84,
-  "faulty_windows_flagged": 0.925,
-  "healthy_windows_false_alarm": 0.08,
-  "state_macro_f1": 0.5904351915540874,
-  "recording_state_accuracy": 0.6,
-  "developing_recordings_flagged": "17/20",
+  "healthy_vs_damaged_roc_auc": 0.937059375,
+  "developing_fault_windows_flagged": 0.805,
+  "faulty_windows_flagged": 0.9,
+  "healthy_windows_false_alarm": 0.06,
+  "state_macro_f1": 0.578172871140851,
+  "recording_state_accuracy": 0.5833333333333334,
+  "developing_recordings_flagged": "16/20",
   "healthy_recordings_false_alarm": "1/20",
-  "fault_type_accuracy_damaged_windows": 0.5625
+  "fault_type_accuracy_damaged_windows": 0.65125
 }

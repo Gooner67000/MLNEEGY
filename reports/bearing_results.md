@@ -12,14 +12,21 @@ is bearing wear.
 (all three of their states). Accelerometer only; the temperature channel is excluded because
 it has corrupted values and drifts through each test sequence.
 
+**Order-tracking:** features now include vibration energy expressed as multiples of shaft
+speed (not just fixed Hz bands), the standard way to make a reading comparable across
+machines running at different speeds -- bearing fault frequencies scale with shaft speed,
+not absolute Hz. This rig ran at ~1700-1820 RPM; generalizing to a real customer motor at,
+say, 900 or 3600 RPM is a methodological improvement, not a validated result -- there's no
+data here outside that range to test it against.
+
 | Metric (bearings never seen in training) | Value |
 |---|---|
-| Healthy vs. damaged ROC AUC | 0.941 |
-| **Developing faults caught** (early warning) | **84%** of windows · 17/20 recordings |
-| Fully faulty caught | 92% of windows |
-| False alarms on healthy bearings | 8% of windows · 1/20 recordings |
-| Health state correct (per recording, 3 states) | 36/60 |
-| Fault type correct (damaged windows, 4 types) | 56% |
+| Healthy vs. damaged ROC AUC | 0.937 |
+| **Developing faults caught** (early warning) | **80%** of windows · 16/20 recordings |
+| Fully faulty caught | 90% of windows |
+| False alarms on healthy bearings | 6% of windows · 1/20 recordings |
+| Health state correct (per recording, 3 states) | 35/60 |
+| Fault type correct (damaged windows, 4 types) | 65% |
 
 ![Confusion matrix](bearing_confusion_matrix.png)
 ![Feature importance](bearing_feature_importance.png)
