@@ -27,22 +27,68 @@ PUBLIC_API_BASE = (os.environ.get("PUBLIC_API_BASE") or API_BASE).rstrip("/")
 st.set_page_config(page_title="Predictive Maintenance Platform", page_icon="🛠️", layout="wide")
 
 
+WAKING_UP = ("The server is starting up (free hosting sleeps after ~15 idle minutes). "
+             "Wait about a minute and try again.")
+TIMEOUT = 90  # a cold start on free hosting takes ~50 s
+
+
+def _error_message(resp: requests.Response) -> str:
+    """Human-readable message for any error response -- JSON or not."""
+    if resp.status_code in (502, 503, 504):
+        return WAKING_UP
+    try:
+        detail = resp.json().get("detail", resp.text)
+    except ValueError:  # not JSON, e.g. an HTML error page from the hosting gateway
+        return f"The server returned an error ({resp.status_code}). Please try again."
+    if isinstance(detail, list):  # FastAPI validation errors
+        return "; ".join(f"{'.'.join(str(p) for p in d.get('loc', [])[1:])}: {d.get('msg')}"
+                         for d in detail)
+    return str(detail)
+
+
 def api(method: str, path: str, **kwargs):
     headers = kwargs.pop("headers", {})
     if st.session_state.get("token"):
         headers["Authorization"] = f"Bearer {st.session_state['token']}"
-    resp = requests.request(method, f"{API_BASE}{path}", headers=headers, timeout=30, **kwargs)
-    if resp.status_code >= 400:
-        st.error(f"{resp.status_code}: {resp.json().get('detail', resp.text)}")
+    try:
+        resp = requests.request(method, f"{API_BASE}{path}", headers=headers,
+                                timeout=TIMEOUT, **kwargs)
+    except requests.RequestException:
+        st.error(WAKING_UP)
         return None
-    return resp.json()
+    if resp.status_code >= 400:
+        st.error(_error_message(resp))
+        return None
+    try:
+        return resp.json()
+    except ValueError:
+        st.error(WAKING_UP)
+        return None
+
+
+def wake_backend() -> bool:
+    """Free hosting puts the API to sleep; wake it before the user types anything."""
+    try:
+        return requests.get(f"{API_BASE}/health", timeout=TIMEOUT).ok
+    except requests.RequestException:
+        return False
 
 
 @st.cache_data(ttl=60)
 def machine_types() -> dict:
-    resp = requests.get(f"{API_BASE}/machine-types", timeout=15)
+    resp = requests.get(f"{API_BASE}/machine-types", timeout=TIMEOUT)
     resp.raise_for_status()
     return resp.json()
+
+
+if not st.session_state.get("backend_awake"):
+    with st.spinner("Waking up the server (can take up to a minute on free hosting)..."):
+        st.session_state["backend_awake"] = wake_backend()
+    if not st.session_state["backend_awake"]:
+        st.warning(WAKING_UP)
+        if st.button("Try again"):
+            st.rerun()
+        st.stop()
 
 
 # --------------------------------------------------------------- auth gate

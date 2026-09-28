@@ -29,6 +29,17 @@ from backend.schemas import (
 
 Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Predictive Maintenance Platform", version="1.0")
+
+
+@app.exception_handler(Exception)
+async def unexpected_error(request, exc):  # noqa: ARG001
+    """Any unexpected error still comes back as JSON the app can display,
+    instead of a bare 'Internal Server Error' page."""
+    import logging
+    logging.getLogger("uvicorn.error").exception("Unhandled error on %s", request.url.path)
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=500, content={"detail": "Something went wrong on the server. "
+                                                            "Please try again."})
 bearer = HTTPBearer()
 
 HISTORY_WINDOW = 20  # readings looked back at for rolling/causal features

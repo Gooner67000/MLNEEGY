@@ -226,3 +226,10 @@ def test_conveyor_bearing_signature_scores_riskier_than_normal():
     normal = _score(token, mid, {"rms": 0.13, "peak": 0.45, "crest": 3.4, "kurtosis": -0.2})
     faulty = _score(token, mid, {"rms": 0.6, "peak": 4.0, "crest": 7.0, "kurtosis": 3.0})
     assert faulty["probability"] > normal["probability"]
+
+
+def test_overlong_password_gets_a_clear_422_not_a_server_crash():
+    resp = client.post("/auth/register", json={"name": "Acme", "email": "long@example.com",
+                                               "password": "x" * 100})
+    assert resp.status_code == 422
+    assert "72 bytes" in str(resp.json()["detail"])
